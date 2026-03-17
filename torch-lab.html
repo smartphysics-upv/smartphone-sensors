@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Torch Lab — Flashlight Controller</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c10; --panel: #0d1520; --border: #1a2f4a;
+    --torch: #facc15; --torch2: #fb923c; --torch3: #fde68a;
+    --text: #c8dff0; --dim: #4a6a85;
+    --glow: rgba(250,204,21,0.3); --glow2: rgba(251,146,60,0.25);
+    --danger: #ff5e5b; --ok: #22c55e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh; padding: 1rem; overflow-x: hidden;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(250,204,21,0.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(250,204,21,0.018) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+  }
+
+  /* Ambient glow when torch is ON */
+  body.torch-on::after {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(250,204,21,0.07) 0%, transparent 70%);
+    animation: ambientPulse 2s ease-in-out infinite;
+  }
+  @keyframes ambientPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
+
+  .container { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; }
+
+  h1 {
+    font-family: 'Orbitron', sans-serif; font-weight: 900;
+    font-size: clamp(0.85rem, 4vw, 1.15rem); letter-spacing: 0.08em;
+    text-align: center; color: var(--torch); text-shadow: 0 0 20px var(--glow);
+    padding: 1rem 0 0.3rem;
+  }
+  .subtitle { text-align: center; font-size: 0.62rem; color: var(--dim); letter-spacing: 0.25em; text-transform: uppercase; margin-bottom: 1.5rem; }
+
+  /* Support banner */
+  .support-banner {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.7rem 1rem; margin-bottom: 1rem;
+    display: flex; align-items: center; gap: 10px; font-size: 0.65rem;
+  }
+  .support-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .support-dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .support-dot.no { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+  .support-dot.unknown { background: var(--torch); box-shadow: 0 0 8px var(--torch); animation: blink 1s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  /* Tab bar */
+  .tab-bar {
+    display: flex; gap: 0; margin-bottom: 1.2rem;
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  }
+  .tab-btn {
+    flex: 1; padding: 0.65rem 0; background: transparent;
+    font-family: 'Orbitron', sans-serif; font-size: 0.58rem; font-weight: 700;
+    letter-spacing: 0.1em; cursor: pointer; transition: all 0.2s;
+    color: var(--dim); border: none; border-right: 1px solid var(--border);
+  }
+  .tab-btn:last-child { border-right: none; }
+  .tab-btn.active-tab { background: var(--panel); color: var(--torch); box-shadow: inset 0 -2px 0 var(--torch); }
+  .tab-btn:not(.active-tab):hover { color: var(--text); background: rgba(255,255,255,0.03); }
+  .tab-pane { display: none; }
+  .tab-pane.visible { display: block; }
+
+  /* Cards */
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem; margin-bottom: 1rem;
+    position: relative; overflow: hidden;
+  }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+  .card.cy::before { background: linear-gradient(90deg, transparent, var(--torch), transparent); }
+  .card.co::before { background: linear-gradient(90deg, transparent, var(--torch2), transparent); }
+  .card.cw::before { background: linear-gradient(90deg, transparent, #c4b5fd, transparent); }
+  .card-label { font-family: 'Orbitron', sans-serif; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.2em; color: var(--torch); margin-bottom: 0.9rem; }
+  .card.co .card-label { color: var(--torch2); }
+  .card.cw .card-label { color: #c4b5fd; }
+
+  /* Big torch button */
+  .torch-ring {
+    width: 160px; height: 160px; border-radius: 50%; margin: 0 auto 1.2rem;
+    border: 2px solid rgba(250,204,21,0.2);
+    display: flex; align-items: center; justify-content: center;
+    position: relative; cursor: pointer; transition: all 0.25s;
+  }
+  .torch-ring::before {
+    content: ''; position: absolute; inset: -8px; border-radius: 50%;
+    border: 1px solid rgba(250,204,21,0.08); transition: all 0.25s;
+  }
+  .torch-ring::after {
+    content: ''; position: absolute; inset: -18px; border-radius: 50%;
+    border: 1px solid rgba(250,204,21,0.04); transition: all 0.25s;
+  }
+  .torch-ring.on {
+    border-color: var(--torch);
+    box-shadow: 0 0 30px var(--glow), 0 0 60px rgba(250,204,21,0.15), inset 0 0 20px rgba(250,204,21,0.05);
+  }
+  .torch-ring.on::before { border-color: rgba(250,204,21,0.3); box-shadow: 0 0 20px var(--glow); }
+  .torch-ring.on::after  { border-color: rgba(250,204,21,0.12); box-shadow: 0 0 40px rgba(250,204,21,0.1); }
+
+  .torch-inner {
+    width: 110px; height: 110px; border-radius: 50%;
+    background: radial-gradient(circle, #1a2030 60%, #0d1520 100%);
+    border: 1.5px solid var(--border); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 6px;
+    transition: all 0.25s; position: relative; overflow: hidden;
+  }
+  .torch-ring.on .torch-inner {
+    background: radial-gradient(circle, rgba(250,204,21,0.12) 0%, #0d1520 70%);
+    border-color: rgba(250,204,21,0.4);
+  }
+  .torch-icon { font-size: 2.2rem; transition: filter 0.25s; }
+  .torch-ring.on .torch-icon { filter: drop-shadow(0 0 12px rgba(250,204,21,0.9)); }
+  .torch-state {
+    font-family: 'Orbitron', sans-serif; font-size: 0.65rem; font-weight: 700;
+    letter-spacing: 0.25em; color: var(--dim); transition: color 0.25s;
+  }
+  .torch-ring.on .torch-state { color: var(--torch); text-shadow: 0 0 10px var(--glow); }
+
+  .torch-hint { text-align: center; font-size: 0.55rem; color: var(--dim); letter-spacing: 0.1em; margin-bottom: 0.8rem; }
+
+  /* Status grid */
+  .status-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem; }
+  .stat-box { background: #050a0e; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.6rem; text-align: center; }
+  .stat-lbl { font-size: 0.46rem; color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 3px; }
+  .stat-val { font-family: 'Orbitron', sans-serif; font-size: 0.75rem; color: var(--torch); }
+
+  /* Sliders */
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 4px;
+    border-radius: 2px; outline: none; cursor: pointer; margin: 0.4rem 0;
+    background: linear-gradient(90deg, var(--torch) var(--pct,50%), var(--border) var(--pct,50%));
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--torch); border: 2px solid var(--bg);
+    box-shadow: 0 0 10px var(--glow); cursor: pointer;
+  }
+  .orange input[type=range] {
+    background: linear-gradient(90deg, var(--torch2) var(--pct,50%), var(--border) var(--pct,50%));
+  }
+  .orange input[type=range]::-webkit-slider-thumb { background: var(--torch2); box-shadow: 0 0 10px var(--glow2); }
+
+  .param-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem; }
+  .param-lbl { font-size: 0.6rem; color: var(--dim); letter-spacing: 0.08em; }
+  .param-val { font-family: 'Orbitron', sans-serif; font-size: 0.78rem; color: var(--torch); }
+  .orange .param-val { color: var(--torch2); }
+
+  /* Strobe / Blink mode */
+  .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem; }
+  .mode-btn {
+    background: #050a0e; border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.75rem 0.8rem; cursor: pointer; transition: all 0.2s;
+    font-family: 'Share Tech Mono', monospace; font-size: 0.62rem; color: var(--text);
+    display: flex; flex-direction: column; gap: 3px; text-align: left;
+  }
+  .mode-btn:hover { border-color: var(--torch); color: var(--torch); box-shadow: 0 0 8px var(--glow); }
+  .mode-btn.active-mode { border-color: var(--torch); background: rgba(250,204,21,0.07); box-shadow: 0 0 10px var(--glow); }
+  .mode-name { font-family: 'Orbitron', sans-serif; font-size: 0.58rem; font-weight: 700; letter-spacing: 0.1em; color: var(--torch); }
+  .mode-btn:not(.active-mode) .mode-name { color: var(--dim); }
+  .mode-desc { font-size: 0.52rem; color: var(--dim); }
+
+  /* SOS display */
+  .sos-display {
+    background: #050a0e; border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.7rem 1rem; margin-bottom: 0.8rem; text-align: center;
+  }
+  .sos-dots { font-family: 'Orbitron', sans-serif; font-size: 1.4rem; letter-spacing: 0.3em; color: var(--dim); transition: all 0.1s; }
+  .sos-dots.lit { color: var(--torch); text-shadow: 0 0 20px var(--glow); }
+  .sos-label { font-size: 0.52rem; color: var(--dim); letter-spacing: 0.2em; margin-top: 4px; }
+
+  /* Sequence builder */
+  .seq-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; padding: 0.5rem 0.7rem; background: #050a0e; border: 1px solid var(--border); border-radius: 6px; }
+  .seq-idx { font-size: 0.55rem; color: var(--dim); width: 16px; text-align: center; flex-shrink: 0; }
+  .seq-input { background: transparent; border: none; border-bottom: 1px solid var(--border); color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; width: 55px; text-align: center; outline: none; padding: 2px 0; -moz-appearance: textfield; }
+  .seq-input::-webkit-inner-spin-button, .seq-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .seq-input:focus { border-bottom-color: var(--torch); }
+  .seq-sep { font-size: 0.55rem; color: var(--dim); }
+  .seq-del { background: transparent; border: none; color: var(--dim); cursor: pointer; font-size: 0.8rem; padding: 0 4px; margin-left: auto; transition: color 0.2s; }
+  .seq-del:hover { color: var(--danger); }
+
+  /* Buttons */
+  .btn-primary {
+    width: 100%; padding: 0.85rem; border-radius: 6px; border: 1.5px solid var(--torch);
+    background: rgba(250,204,21,0.08); color: var(--torch);
+    font-family: 'Orbitron', sans-serif; font-size: 0.75rem; font-weight: 700;
+    letter-spacing: 0.2em; cursor: pointer; transition: all 0.15s;
+    box-shadow: 0 0 12px var(--glow); margin-bottom: 0.5rem;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-primary:hover { background: rgba(250,204,21,0.18); box-shadow: 0 0 24px var(--glow); }
+  .btn-primary:active { transform: scale(0.97); }
+  .btn-primary.active { background: rgba(250,204,21,0.22); animation: activePulse 1.5s ease-in-out infinite; }
+  @keyframes activePulse { 0%,100%{box-shadow:0 0 12px var(--glow)} 50%{box-shadow:0 0 28px rgba(250,204,21,0.5)} }
+
+  .btn-danger {
+    width: 100%; padding: 0.7rem; border-radius: 6px; border: 1px solid rgba(255,94,91,0.4);
+    background: rgba(255,94,91,0.06); color: var(--danger);
+    font-family: 'Orbitron', sans-serif; font-size: 0.7rem; font-weight: 700;
+    letter-spacing: 0.15em; cursor: pointer; transition: all 0.15s; margin-bottom: 0.5rem;
+  }
+  .btn-danger:hover { border-color: var(--danger); background: rgba(255,94,91,0.14); box-shadow: 0 0 12px rgba(255,94,91,0.3); }
+
+  .btn-row { display: flex; gap: 0.5rem; }
+  .btn-row .btn-sm {
+    flex: 1; padding: 0.6rem; border-radius: 5px; border: 1px solid var(--border);
+    background: transparent; color: var(--dim); font-family: 'Share Tech Mono', monospace;
+    font-size: 0.62rem; letter-spacing: 0.08em; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-row .btn-sm:hover { border-color: var(--torch); color: var(--torch); }
+
+  /* Status log */
+  .status-log {
+    background: #050a0e; border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.6rem 0.8rem; height: 85px; overflow-y: auto; font-size: 0.6rem;
+    line-height: 1.6; color: var(--dim); margin-bottom: 1rem;
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  }
+  .log-entry { display: flex; gap: 8px; }
+  .log-time { color: var(--torch2); flex-shrink: 0; }
+  .log-msg.ok { color: var(--ok); }
+  .log-msg.warn { color: #facc15; }
+  .log-msg.err { color: var(--danger); }
+  .log-msg.info { color: var(--text); }
+
+  /* Canvas visualizer */
+  #torchCanvas {
+    width: 100%; height: 80px; display: block;
+    border-radius: 4px; background: #030608; border: 1px solid var(--border); margin-top: 0.7rem;
+  }
+
+  .footer { text-align: center; font-size: 0.55rem; color: var(--dim); letter-spacing: 0.15em; padding: 0.5rem 0 1.5rem; opacity: 0.5; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>⚡ Torch Lab</h1>
+  <p class="subtitle">Flashlight Controller · Strobe · Morse · Sequence</p>
+
+  <div class="support-banner" id="supportBanner">
+    <div class="support-dot unknown" id="supportDot"></div>
+    <div id="supportText" style="font-size:0.65rem">Checking torch API support…</div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn active-tab" id="tabMain"     onclick="switchTab('main')">💡 TORCH</button>
+    <button class="tab-btn"            id="tabStrobe"   onclick="switchTab('strobe')">⚡ STROBE</button>
+    <button class="tab-btn"            id="tabSequence" onclick="switchTab('sequence')">🔗 SEQUENCE</button>
+    <button class="tab-btn"            id="tabMorse"    onclick="switchTab('morse')">· − SOS</button>
+  </div>
+
+  <div class="status-log" id="statusLog"></div>
+
+  <!-- ── MAIN TAB ── -->
+  <div class="tab-pane visible" id="paneMain">
+
+    <div class="card cy" style="text-align:center; padding: 1.5rem 1.2rem;">
+      <div class="torch-ring" id="torchRing" onclick="toggleTorch()">
+        <div class="torch-inner">
+          <div class="torch-icon">🔦</div>
+          <div class="torch-state" id="torchState">OFF</div>
+        </div>
+      </div>
+      <div class="torch-hint">TAP TO TOGGLE</div>
+
+      <div class="status-grid">
+        <div class="stat-box"><div class="stat-lbl">Status</div><div class="stat-val" id="statStatus">OFF</div></div>
+        <div class="stat-box"><div class="stat-lbl">Mode</div><div class="stat-val" id="statMode">MANUAL</div></div>
+        <div class="stat-box"><div class="stat-lbl">On Time</div><div class="stat-val" id="statTime">0s</div></div>
+      </div>
+    </div>
+
+    <canvas id="torchCanvas"></canvas>
+
+  </div>
+
+  <!-- ── STROBE TAB ── -->
+  <div class="tab-pane" id="paneStrobe">
+
+    <div class="card cy">
+      <div class="card-label">STROBE FREQUENCY</div>
+      <div class="param-row">
+        <span class="param-lbl">Rate</span>
+        <span class="param-val" id="strobeFreqVal">4 Hz</span>
+      </div>
+      <input type="range" id="strobeFreqSlider" min="0.5" max="20" step="0.5" value="4"
+        oninput="updateStrobeFreq(this.value)" style="--pct:18%">
+      <div style="display:flex;justify-content:space-between;font-size:0.5rem;color:var(--dim);padding:0 2px">
+        <span>0.5</span><span>5</span><span>10</span><span>15</span><span>20 Hz</span>
+      </div>
+    </div>
+
+    <div class="card co orange">
+      <div class="card-label" style="color:var(--torch2)">DUTY CYCLE</div>
+      <div class="param-row">
+        <span class="param-lbl">On-time ratio</span>
+        <span class="param-val" id="strobeDutyVal">50%</span>
+      </div>
+      <input type="range" id="strobeDutySlider" min="5" max="95" step="5" value="50"
+        oninput="updateStrobeDuty(this.value)" style="--pct:50%">
+      <div style="display:flex;justify-content:space-between;font-size:0.5rem;color:var(--dim);padding:0 2px">
+        <span>5%</span><span>25%</span><span>50%</span><span>75%</span><span>95%</span>
+      </div>
+    </div>
+
+    <div class="card cw">
+      <div class="card-label" style="color:#c4b5fd">STROBE MODES</div>
+      <div class="mode-grid">
+        <button class="mode-btn active-mode" id="mode-steady"  onclick="selectStrobeMode('steady')">
+          <div class="mode-name">STEADY</div><div class="mode-desc">Constant on/off flash</div>
+        </button>
+        <button class="mode-btn" id="mode-ramp-up"   onclick="selectStrobeMode('ramp-up')">
+          <div class="mode-name">RAMP UP</div><div class="mode-desc">Accelerating strobe</div>
+        </button>
+        <button class="mode-btn" id="mode-ramp-down" onclick="selectStrobeMode('ramp-down')">
+          <div class="mode-name">RAMP DOWN</div><div class="mode-desc">Decelerating strobe</div>
+        </button>
+        <button class="mode-btn" id="mode-random"    onclick="selectStrobeMode('random')">
+          <div class="mode-name">RANDOM</div><div class="mode-desc">Chaotic bursts</div>
+        </button>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="strobeFire" onclick="toggleStrobe()">⚡ START STROBE</button>
+    <button class="btn-danger"                  onclick="stopAll()">■ STOP ALL</button>
+
+  </div>
+
+  <!-- ── SEQUENCE TAB ── -->
+  <div class="tab-pane" id="paneSequence">
+
+    <div class="card cy">
+      <div class="card-label">CUSTOM FLASH SEQUENCE</div>
+      <div id="seqList"></div>
+      <div class="btn-row" style="margin-top:0.7rem">
+        <button class="btn-sm" onclick="addSeqStep(300, 200)">＋ ADD STEP</button>
+        <button class="btn-sm" style="color:var(--torch);border-color:rgba(250,204,21,0.4)" onclick="runSequence()">▶ RUN</button>
+        <button class="btn-sm" onclick="stopAll()">■ STOP</button>
+      </div>
+    </div>
+
+    <div class="card co">
+      <div class="card-label" style="color:var(--torch2)">QUICK PATTERNS</div>
+      <div class="mode-grid">
+        <button class="mode-btn" onclick="loadPattern('beacon')">
+          <div class="mode-name" style="color:var(--torch2)">BEACON</div><div class="mode-desc">Slow pulse every 2s</div>
+        </button>
+        <button class="mode-btn" onclick="loadPattern('double')">
+          <div class="mode-name" style="color:var(--torch2)">DOUBLE TAP</div><div class="mode-desc">Two quick flashes</div>
+        </button>
+        <button class="mode-btn" onclick="loadPattern('breathe')">
+          <div class="mode-name" style="color:var(--torch2)">BREATHE</div><div class="mode-desc">Slow ramp in/out</div>
+        </button>
+        <button class="mode-btn" onclick="loadPattern('alarm')">
+          <div class="mode-name" style="color:var(--torch2)">ALARM</div><div class="mode-desc">Rapid 10x flash</div>
+        </button>
+        <button class="mode-btn" onclick="loadPattern('heartbeat')">
+          <div class="mode-name" style="color:var(--torch2)">HEARTBEAT</div><div class="mode-desc">Lub-dub rhythm</div>
+        </button>
+        <button class="mode-btn" onclick="loadPattern('lightning')">
+          <div class="mode-name" style="color:var(--torch2)">LIGHTNING</div><div class="mode-desc">Chaotic burst</div>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── MORSE / SOS TAB ── -->
+  <div class="tab-pane" id="paneMorse">
+
+    <div class="card cy" style="text-align:center">
+      <div class="card-label">SOS DISTRESS SIGNAL</div>
+      <div class="sos-display">
+        <div class="sos-dots" id="sosDots">· · · — — — · · ·</div>
+        <div class="sos-label">INTERNATIONAL DISTRESS — S·O·S</div>
+      </div>
+      <button class="btn-primary" id="sosFire" onclick="toggleSOS()" style="margin-bottom:0">
+        <span id="sosLbl">📡 SEND SOS</span>
+      </button>
+    </div>
+
+    <div class="card co">
+      <div class="card-label" style="color:var(--torch2)">CUSTOM MORSE TEXT</div>
+      <div style="margin-bottom:0.7rem">
+        <div style="font-size:0.58rem;color:var(--dim);margin-bottom:0.5rem">Enter text to encode as Morse light flashes:</div>
+        <input id="morseInput" type="text" value="HELP"
+          style="width:100%;background:#050a0e;border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:0.85rem;padding:8px 10px;outline:none;letter-spacing:0.1em"
+          oninput="updateMorsePreview()" placeholder="Type message…">
+        <div id="morsePreview" style="font-size:0.58rem;color:var(--torch);margin-top:6px;letter-spacing:0.15em;min-height:1rem;word-break:break-all"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-sm" style="color:var(--torch);border-color:rgba(250,204,21,0.4)" onclick="sendMorse()" id="morseFire">▶ SEND</button>
+        <button class="btn-sm" onclick="stopAll()">■ STOP</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">TORCH LAB v1.0 · MEDIADEVICES TORCH API</div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────
+let stream = null, track = null;
+let torchOn = false;
+let strobeActive = false, strobeTimer = null, strobeMode = 'steady';
+let strobeFreq = 4, strobeDuty = 50;
+let seqSteps = [];
+let sosActive = false, sosTimer = null;
+let morseActive = false;
+let activeMode = 'MANUAL';
+let onTimerStart = null, onTimerInterval = null;
+let canvasAnimId = null;
+const torchHistory = []; // for canvas: array of {t, state}
+
+// ── Morse table ───────────────────────────────────────────────────────
+const MORSE = {
+  A:'.-', B:'-...', C:'-.-.', D:'-..', E:'.', F:'..-.', G:'--.',
+  H:'....', I:'..', J:'.---', K:'-.-', L:'.-..', M:'--', N:'-.',
+  O:'---', P:'.--.', Q:'--.-', R:'.-.', S:'...', T:'-', U:'..-',
+  V:'...-', W:'.--', X:'-..-', Y:'-.--', Z:'--..',
+  '0':'-----','1':'.----','2':'..---','3':'...--','4':'....-',
+  '5':'.....','6':'-....','7':'--...','8':'---..','9':'----.',
+  ' ':'/'
+};
+const DOT = 80, DASH = 240, SYM_GAP = 80, CHAR_GAP = 240, WORD_GAP = 560;
+
+// ── Logging ───────────────────────────────────────────────────────────
+function log(msg, type='info') {
+  const box = document.getElementById('statusLog');
+  const now = new Date();
+  const ts = now.toTimeString().slice(0,8) + '.' + now.getMilliseconds().toString().padStart(3,'0');
+  const el = document.createElement('div');
+  el.className = 'log-entry';
+  el.innerHTML = `<span class="log-time">[${ts}]</span><span class="log-msg ${type}">${msg}</span>`;
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+  while (box.children.length > 60) box.removeChild(box.firstChild);
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────
+function switchTab(tab) {
+  ['main','strobe','sequence','morse'].forEach(t => {
+    const p = 'pane' + t.charAt(0).toUpperCase() + t.slice(1);
+    const b = 'tab'  + t.charAt(0).toUpperCase() + t.slice(1);
+    document.getElementById(p).classList.toggle('visible', t === tab);
+    document.getElementById(b).classList.toggle('active-tab', t === tab);
+  });
+}
+
+// ── Camera/Torch init ─────────────────────────────────────────────────
+async function initCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', advanced: [{ torch: false }] }
+    });
+    track = stream.getVideoTracks()[0];
+    const caps = track.getCapabilities();
+    if (caps.torch) {
+      setSupport('ok', '✓ Torch supported — camera ready');
+      log('Camera acquired, torch capability confirmed', 'ok');
+    } else {
+      setSupport('warn', '⚠ Camera ready but torch not supported on this device');
+      log('Camera ready but no torch capability', 'warn');
+    }
+  } catch (e) {
+    setSupport('no', '✗ Camera permission denied or not available');
+    log('Camera access failed: ' + e.message, 'err');
+  }
+}
+
+function setSupport(state, msg) {
+  const dot = document.getElementById('supportDot');
+  const txt = document.getElementById('supportText');
+  dot.className = 'support-dot ' + (state === 'warn' ? 'unknown' : state);
+  txt.textContent = msg;
+  txt.style.color = state === 'ok' ? 'var(--ok)' : state === 'no' ? 'var(--danger)' : '#facc15';
+}
+
+// ── Low-level torch control ───────────────────────────────────────────
+async function setTorch(on) {
+  if (!track) return false;
+  try {
+    await track.applyConstraints({ advanced: [{ torch: on }] });
+    return true;
+  } catch (e) {
+    log('Torch constraint failed: ' + e.message, 'err');
+    return false;
+  }
+}
+
+// ── Manual toggle ─────────────────────────────────────────────────────
+async function toggleTorch() {
+  if (strobeActive || sosActive || morseActive) { stopAll(); return; }
+  if (!track) { await initCamera(); if (!track) return; }
+
+  torchOn = !torchOn;
+  const ok = await setTorch(torchOn);
+  if (!ok) { torchOn = false; return; }
+
+  updateTorchUI(torchOn);
+  if (torchOn) {
+    onTimerStart = Date.now();
+    onTimerInterval = setInterval(updateOnTimer, 1000);
+    log('Torch ON', 'ok');
+  } else {
+    clearInterval(onTimerInterval);
+    document.getElementById('statTime').textContent = '0s';
+    log('Torch OFF', 'info');
+  }
+  recordHistory(torchOn);
+}
+
+function updateTorchUI(on) {
+  const ring = document.getElementById('torchRing');
+  ring.classList.toggle('on', on);
+  document.getElementById('torchState').textContent = on ? 'ON' : 'OFF';
+  document.getElementById('statStatus').textContent = on ? 'ON' : 'OFF';
+  document.getElementById('statStatus').style.color = on ? 'var(--torch)' : 'var(--dim)';
+  document.body.classList.toggle('torch-on', on);
+  torchOn = on;
+}
+
+function updateOnTimer() {
+  if (!torchOn) return;
+  const s = Math.floor((Date.now() - onTimerStart) / 1000);
+  document.getElementById('statTime').textContent = s < 60 ? s + 's' : Math.floor(s/60) + 'm' + (s%60) + 's';
+}
+
+function recordHistory(on) {
+  torchHistory.push({ t: Date.now(), on });
+  if (torchHistory.length > 200) torchHistory.shift();
+  drawCanvas();
+}
+
+// ── Strobe ────────────────────────────────────────────────────────────
+function updateStrobeFreq(v) {
+  strobeFreq = parseFloat(v);
+  const pct = ((v - 0.5) / 19.5 * 100).toFixed(1);
+  document.getElementById('strobeFreqSlider').style.setProperty('--pct', pct + '%');
+  document.getElementById('strobeFreqVal').textContent = strobeFreq + ' Hz';
+  if (strobeActive) restartStrobe();
+}
+function updateStrobeDuty(v) {
+  strobeDuty = parseInt(v);
+  const pct = ((v - 5) / 90 * 100).toFixed(1);
+  document.getElementById('strobeDutySlider').style.setProperty('--pct', pct + '%');
+  document.getElementById('strobeDutyVal').textContent = strobeDuty + '%';
+  if (strobeActive) restartStrobe();
+}
+function selectStrobeMode(mode) {
+  strobeMode = mode;
+  document.querySelectorAll('.mode-btn[id^=mode-]').forEach(b => b.classList.remove('active-mode'));
+  document.getElementById('mode-' + mode).classList.add('active-mode');
+  if (strobeActive) restartStrobe();
+}
+
+async function toggleStrobe() {
+  if (strobeActive) { stopAll(); return; }
+  if (!track) { await initCamera(); if (!track) return; }
+  strobeActive = true;
+  activeMode = 'STROBE';
+  document.getElementById('statMode').textContent = 'STROBE';
+  document.getElementById('strobeFire').textContent = '■ STOP STROBE';
+  document.getElementById('strobeFire').classList.add('active');
+  log('Strobe started: ' + strobeFreq + 'Hz, duty ' + strobeDuty + '%, mode: ' + strobeMode, 'ok');
+  runStrobe(0);
+}
+
+let strobeStep = 0;
+function runStrobe(step) {
+  if (!strobeActive) return;
+  strobeStep = step;
+
+  let freq = strobeFreq;
+  if (strobeMode === 'ramp-up')   freq = strobeFreq * (0.2 + 0.8 * ((step % 40) / 40));
+  if (strobeMode === 'ramp-down') freq = strobeFreq * (1 - 0.8 * ((step % 40) / 40));
+  if (strobeMode === 'random')    freq = strobeFreq * (0.3 + Math.random() * 1.4);
+
+  const period = 1000 / Math.max(0.2, freq);
+  const onTime  = Math.max(20, period * (strobeDuty / 100));
+  const offTime = Math.max(10, period - onTime);
+
+  setTorch(true).then(() => {
+    updateTorchUI(true); recordHistory(true);
+    strobeTimer = setTimeout(() => {
+      setTorch(false).then(() => {
+        updateTorchUI(false); recordHistory(false);
+        strobeTimer = setTimeout(() => runStrobe(step + 1), offTime);
+      });
+    }, onTime);
+  });
+}
+
+function restartStrobe() {
+  clearTimeout(strobeTimer);
+  setTorch(false).then(() => runStrobe(strobeStep));
+}
+
+// ── Sequence ──────────────────────────────────────────────────────────
+function addSeqStep(on=300, off=200) {
+  seqSteps.push({ on, off });
+  renderSeqList();
+}
+function removeSeqStep(i) { seqSteps.splice(i, 1); renderSeqList(); }
+function renderSeqList() {
+  const list = document.getElementById('seqList');
+  list.innerHTML = '';
+  seqSteps.forEach((step, i) => {
+    const row = document.createElement('div');
+    row.className = 'seq-row';
+    row.innerHTML = `
+      <span class="seq-idx">${i+1}</span>
+      <span class="seq-sep" style="color:var(--torch)">ON</span>
+      <input class="seq-input" type="number" min="10" max="10000" value="${step.on}"
+        onchange="seqSteps[${i}].on=parseInt(this.value)||10" style="color:var(--torch)">
+      <span class="seq-sep">ms</span>
+      <span class="seq-sep" style="margin-left:4px">OFF</span>
+      <input class="seq-input" type="number" min="0" max="10000" value="${step.off}"
+        onchange="seqSteps[${i}].off=parseInt(this.value)||0">
+      <span class="seq-sep">ms</span>
+      <button class="seq-del" onclick="removeSeqStep(${i})">✕</button>`;
+    list.appendChild(row);
+  });
+}
+
+const PATTERNS = {
+  beacon:    [{on:100,off:1900}],
+  double:    [{on:80,off:100},{on:80,off:1200}],
+  breathe:   [{on:40,off:200},{on:80,off:160},{on:160,off:100},{on:280,off:60},{on:400,off:40},{on:280,off:60},{on:160,off:100},{on:80,off:160},{on:40,off:300}],
+  alarm:     Array.from({length:10}, ()=>({on:50,off:50})),
+  heartbeat: [{on:80,off:60},{on:60,off:500},{on:80,off:60},{on:60,off:800}],
+  lightning: [{on:20,off:80},{on:60,off:30},{on:15,off:120},{on:40,off:50},{on:80,off:40},{on:25,off:200}]
+};
+function loadPattern(name) {
+  seqSteps = PATTERNS[name].map(s => ({...s}));
+  renderSeqList();
+  log('Pattern "' + name + '" loaded into sequence', 'ok');
+}
+
+async function runSequence() {
+  if (!track) { await initCamera(); if (!track) return; }
+  if (seqSteps.length === 0) { log('No sequence steps', 'warn'); return; }
+  activeMode = 'SEQ';
+  document.getElementById('statMode').textContent = 'SEQ';
+  log('Sequence started: ' + seqSteps.length + ' steps', 'ok');
+  await executeSequence(seqSteps, false);
+}
+
+async function executeSequence(steps, loop) {
+  for (const step of steps) {
+    if (!strobeActive && !sosActive && !morseActive && activeMode !== 'SEQ') return;
+    if (activeMode !== 'SEQ' && !loop) return;
+    await setTorch(true);  updateTorchUI(true);  recordHistory(true);
+    await sleep(step.on);
+    await setTorch(false); updateTorchUI(false); recordHistory(false);
+    await sleep(step.off);
+  }
+  if (activeMode === 'SEQ') {
+    activeMode = 'MANUAL';
+    document.getElementById('statMode').textContent = 'MANUAL';
+    log('Sequence complete', 'info');
+  }
+}
+
+// ── SOS ───────────────────────────────────────────────────────────────
+const SOS_PATTERN = [
+  {on:DOT,off:SYM_GAP},{on:DOT,off:SYM_GAP},{on:DOT,off:CHAR_GAP},       // S
+  {on:DASH,off:SYM_GAP},{on:DASH,off:SYM_GAP},{on:DASH,off:CHAR_GAP},     // O
+  {on:DOT,off:SYM_GAP},{on:DOT,off:SYM_GAP},{on:DOT,off:WORD_GAP*2},      // S + pause
+];
+
+async function toggleSOS() {
+  if (sosActive) { stopAll(); return; }
+  if (!track) { await initCamera(); if (!track) return; }
+  sosActive = true;
+  activeMode = 'SOS';
+  document.getElementById('statMode').textContent = 'SOS';
+  document.getElementById('sosLbl').textContent = '■ STOP SOS';
+  document.getElementById('sosFire').classList.add('active');
+  log('SOS transmission started', 'ok');
+  sosCycle();
+}
+
+async function sosCycle() {
+  if (!sosActive) return;
+  const dots = document.getElementById('sosDots');
+  const symbols = ['·','·','·','—','—','—','·','·','·'];
+  for (let i = 0; i < SOS_PATTERN.length; i++) {
+    if (!sosActive) break;
+    const step = SOS_PATTERN[i];
+    dots.textContent = symbols[i]; dots.classList.add('lit');
+    await setTorch(true); updateTorchUI(true); recordHistory(true);
+    await sleep(step.on);
+    dots.classList.remove('lit');
+    await setTorch(false); updateTorchUI(false); recordHistory(false);
+    await sleep(step.off);
+  }
+  if (sosActive) {
+    dots.textContent = '· · · — — — · · ·';
+    sosCycle();
+  }
+}
+
+// ── Morse text encoder ────────────────────────────────────────────────
+function textToMorse(text) {
+  return text.toUpperCase().split('').map(c => MORSE[c] || '').filter(Boolean).join(' ');
+}
+
+function updateMorsePreview() {
+  const text = document.getElementById('morseInput').value;
+  document.getElementById('morsePreview').textContent = textToMorse(text) || '—';
+}
+
+async function sendMorse() {
+  const text = document.getElementById('morseInput').value.trim();
+  if (!text) { log('No text to send', 'warn'); return; }
+  if (morseActive) { stopAll(); return; }
+  if (!track) { await initCamera(); if (!track) return; }
+
+  morseActive = true;
+  activeMode = 'MORSE';
+  document.getElementById('statMode').textContent = 'MORSE';
+  document.getElementById('morseFire').textContent = '■ STOP';
+  log('Morse: ' + text + ' → ' + textToMorse(text), 'ok');
+
+  const chars = text.toUpperCase().split('');
+  for (let ci = 0; ci < chars.length; ci++) {
+    if (!morseActive) break;
+    const ch = chars[ci];
+    if (ch === ' ') { await sleep(WORD_GAP); continue; }
+    const code = MORSE[ch];
+    if (!code) continue;
+    for (let si = 0; si < code.length; si++) {
+      if (!morseActive) break;
+      const sym = code[si];
+      const dur = sym === '.' ? DOT : DASH;
+      await setTorch(true); updateTorchUI(true); recordHistory(true);
+      await sleep(dur);
+      await setTorch(false); updateTorchUI(false); recordHistory(false);
+      if (si < code.length - 1) await sleep(SYM_GAP);
+    }
+    if (ci < chars.length - 1) await sleep(CHAR_GAP);
+  }
+
+  if (morseActive) {
+    morseActive = false;
+    activeMode = 'MANUAL';
+    document.getElementById('statMode').textContent = 'MANUAL';
+    document.getElementById('morseFire').textContent = '▶ SEND';
+    log('Morse transmission complete', 'info');
+  }
+}
+
+// ── Stop all ──────────────────────────────────────────────────────────
+async function stopAll() {
+  strobeActive = false;
+  sosActive = false;
+  morseActive = false;
+  clearTimeout(strobeTimer);
+  clearTimeout(sosTimer);
+  activeMode = 'MANUAL';
+  await setTorch(false);
+  updateTorchUI(false);
+  clearInterval(onTimerInterval);
+  document.getElementById('statMode').textContent = 'MANUAL';
+  document.getElementById('statTime').textContent = '0s';
+  document.getElementById('strobeFire').textContent = '⚡ START STROBE';
+  document.getElementById('strobeFire').classList.remove('active');
+  document.getElementById('sosLbl').textContent = '📡 SEND SOS';
+  document.getElementById('sosFire').classList.remove('active');
+  document.getElementById('morseFire').textContent = '▶ SEND';
+  document.getElementById('sosDots').textContent = '· · · — — — · · ·';
+  document.getElementById('sosDots').classList.remove('lit');
+  recordHistory(false);
+  log('All stopped', 'info');
+}
+
+// ── Canvas visualizer ─────────────────────────────────────────────────
+function drawCanvas() {
+  const c = document.getElementById('torchCanvas');
+  const W = c.offsetWidth || 440; c.width = W; c.height = 80;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#030608'; ctx.fillRect(0, 0, W, 80);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(26,47,74,0.35)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, 40); ctx.lineTo(W, 40); ctx.stroke();
+
+  if (torchHistory.length < 2) {
+    ctx.fillStyle = 'rgba(74,106,133,0.5)'; ctx.font = '9px Share Tech Mono';
+    ctx.fillText('STANDBY — tap torch to activate', 8, 14);
+    return;
+  }
+
+  const now = Date.now();
+  const windowMs = 4000;
+  const recent = torchHistory.filter(h => h.t > now - windowMs);
+  if (recent.length === 0) return;
+
+  ctx.strokeStyle = 'rgba(250,204,21,0.85)'; ctx.lineWidth = 2;
+  ctx.shadowBlur = 8; ctx.shadowColor = '#facc15';
+  ctx.beginPath();
+
+  let prev = { t: now - windowMs, on: false };
+  const toX = t => (t - (now - windowMs)) / windowMs * W;
+  ctx.moveTo(toX(prev.t), prev.on ? 12 : 68);
+
+  for (const h of recent) {
+    const x = toX(h.t);
+    ctx.lineTo(x, prev.on ? 12 : 68); // horizontal
+    ctx.lineTo(x, h.on   ? 12 : 68); // vertical jump
+    prev = h;
+  }
+  ctx.lineTo(W, prev.on ? 12 : 68);
+  ctx.stroke(); ctx.shadowBlur = 0;
+
+  // Label
+  ctx.fillStyle = torchOn ? 'rgba(250,204,21,0.7)' : 'rgba(74,106,133,0.5)';
+  ctx.font = '9px Share Tech Mono';
+  ctx.fillText(torchOn ? 'ACTIVE — ' + activeMode : 'IDLE', 8, 14);
+}
+
+// ── Utility ───────────────────────────────────────────────────────────
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── Init ──────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  addSeqStep(200, 150); addSeqStep(500, 300); addSeqStep(100, 100);
+  updateMorsePreview();
+  drawCanvas();
+  // Try to init camera silently; if permission already granted it will work
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    setSupport('unknown', 'Tap the torch button to request camera permission');
+  } else {
+    setSupport('no', '✗ MediaDevices API not available in this browser');
+    log('MediaDevices not supported', 'err');
+  }
+  log('Torch Lab ready — tap torch to begin', 'info');
+});
+
+window.addEventListener('resize', drawCanvas);
+</script>
+</body>
+</html>

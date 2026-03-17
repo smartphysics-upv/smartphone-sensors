@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f1824">
+<title>SmartPhysics: Rotation Lab</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0f1824; --panel:#162233; --border:#253d5e;
+  --az:#00f5c4; --wz:#ff5e5b; --ph:#a78bfa;
+  --text:#ddeeff; --dim:#6a8faf;
+  /* component colors */
+  --cx:#00f5c4; --cy:#facc15; --cz:#ff5e5b;
+  --cphi:#00f5c4; --cbeta:#a78bfa; --cgamma:#fb923c;
+}
+* { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+html,body { height:100%; overflow:hidden; background:var(--bg); color:var(--text); font-family:'Share Tech Mono',monospace; }
+body { display:flex; flex-direction:column; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+
+/* grid background */
+body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image: linear-gradient(rgba(0,245,196,0.04) 1px,transparent 1px), linear-gradient(90deg,rgba(0,245,196,0.04) 1px,transparent 1px);
+  background-size:36px 36px; }
+
+/* header */
+.hdr { flex-shrink:0; position:relative; z-index:10;
+  padding:10px 16px 8px; border-bottom:1px solid var(--border); background:rgba(15,24,36,0.97); text-align:center; }
+.hdr h1 { font-family:'Orbitron',sans-serif; font-weight:900;
+  font-size:clamp(.75rem,3.5vw,1.05rem); letter-spacing:.08em;
+  color:var(--az); text-shadow:0 0 20px rgba(0,245,196,.3);
+  padding:.4rem 0 .15rem; white-space:nowrap; }
+.hdr-sub { font-size:.56rem; color:var(--dim); letter-spacing:.25em; text-transform:uppercase; margin-bottom:.3rem; }
+.pill { display:inline-flex; align-items:center; gap:6px; background:var(--panel); border:1px solid var(--border); border-radius:20px;
+  padding:5px 12px; font-size:.56rem; letter-spacing:.08em; color:var(--dim); }
+.pill .dot { width:7px; height:7px; border-radius:50%; background:var(--dim); flex-shrink:0; }
+.pill.live { color:var(--az); border-color:var(--az); }
+.pill.live .dot { background:var(--az); animation:blink 1.2s infinite; }
+.pill.err  { color:#fb923c; border-color:#fb923c; }
+.pill.err  .dot { background:#fb923c; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.15} }
+
+/* banner */
+.banner { flex-shrink:0; display:none; padding:8px 14px; background:#1c1200; border-bottom:1px solid #f59e0b;
+  font-size:.58rem; color:#fcd34d; line-height:1.6; letter-spacing:.03em; }
+.banner.show { display:block; }
+
+/* tabs */
+.tabs { flex-shrink:0; display:flex; border-bottom:1px solid var(--border); background:rgba(15,24,36,0.97); position:relative; z-index:9; }
+.tab { flex:1; padding:10px 4px; background:transparent; border:none; border-right:1px solid var(--border);
+  font-family:'Orbitron',sans-serif; font-size:.54rem; font-weight:700; letter-spacing:.1em;
+  color:var(--dim); cursor:pointer; position:relative; }
+.tab:last-child { border-right:none; }
+.tab.on { color:var(--az); background:var(--panel); }
+.tab.on::after { content:''; position:absolute; bottom:0; left:0; right:0; height:2px; background:var(--az); }
+
+/* pages */
+.pages { flex:1; overflow:hidden; position:relative; z-index:1; }
+.page { position:absolute; inset:0; overflow-y:auto; padding:12px 12px 80px; display:none; }
+.page.on { display:block; }
+.page::-webkit-scrollbar { width:3px; }
+.page::-webkit-scrollbar-thumb { background:var(--border); }
+
+/* ctrl bar */
+.ctrl { display:flex; gap:8px; margin-bottom:12px; }
+.btn-start { flex:1; display:flex; align-items:center; justify-content:center; gap:10px;
+  background:transparent; border:2px solid var(--border); border-radius:10px;
+  padding:15px 0; font-family:'Orbitron',sans-serif; font-size:.8rem; font-weight:700;
+  letter-spacing:.2em; color:var(--dim); cursor:pointer; transition:all .25s; }
+.btn-start .dot { width:11px; height:11px; border-radius:50%; background:var(--dim); flex-shrink:0; transition:all .2s; }
+.btn-start.running { color:var(--az); border-color:var(--az); box-shadow:0 0 16px rgba(0,245,196,.25); }
+.btn-start.running .dot { background:var(--az); animation:blink .9s infinite; }
+.btn-start.paused  { color:#facc15; border-color:#facc15; }
+.btn-start.paused  .dot { background:#facc15; }
+.btn-clr { background:transparent; border:1px solid var(--border); border-radius:10px;
+  padding:15px 16px; font-family:'Share Tech Mono',monospace; font-size:.65rem;
+  letter-spacing:.08em; cursor:pointer; color:var(--dim); }
+
+/* stats strip */
+.strip { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:6px; margin-bottom:12px; }
+.st { background:var(--panel); border:1px solid var(--border); border-radius:7px; padding:7px 4px; text-align:center; }
+.st-l { font-size:.42rem; color:var(--dim); letter-spacing:.1em; text-transform:uppercase; margin-bottom:3px; }
+.st-v { font-family:'Orbitron',sans-serif; font-size:.7rem; }
+
+/* plot card */
+.pc { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px 13px; margin-bottom:10px; position:relative; overflow:hidden; }
+.pc::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.pc.az::before { background:linear-gradient(90deg,transparent,var(--az),transparent); }
+.pc.wz::before { background:linear-gradient(90deg,transparent,var(--wz),transparent); }
+.pc.ph::before { background:linear-gradient(90deg,transparent,var(--ph),transparent); }
+.pc-hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+.pc-title { font-family:'Orbitron',sans-serif; font-size:.65rem; font-weight:700; letter-spacing:.15em; }
+.az .pc-title { color:var(--az); } .wz .pc-title { color:var(--wz); } .ph .pc-title { color:var(--ph); }
+.pc-sub { font-size:.48rem; color:var(--dim); margin-top:2px; }
+.ax { font-size:.48rem; color:var(--dim); text-align:right; line-height:1.7; }
+canvas.cv { display:block; width:100%; height:170px; border-radius:5px; background:#0a1520; border:1px solid var(--border); }
+.pc-stats { display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px; margin-top:7px; }
+.ps { background:#0a1220; border:1px solid var(--border); border-radius:5px; padding:6px 4px; text-align:center; }
+.ps-l { font-size:.42rem; color:var(--dim); letter-spacing:.1em; text-transform:uppercase; margin-bottom:2px; }
+.ps-v { font-family:'Orbitron',sans-serif; font-size:.7rem; }
+
+/* toggle row for series */
+.toggle-row { display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
+.tog { display:flex; align-items:center; gap:5px; padding:5px 10px;
+  border-radius:20px; border:1px solid var(--border); cursor:pointer;
+  font-size:.5rem; letter-spacing:.07em; font-family:'Share Tech Mono',monospace;
+  transition:all .2s; opacity:.45; user-select:none; }
+.tog.on { opacity:1; }
+.tog .swatch { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+/* zoom hint bar */
+.zoom-hint { display:none; align-items:center; justify-content:center; gap:6px;
+  margin-top:5px; padding:4px 10px; background:rgba(0,245,196,.08);
+  border:1px solid rgba(0,245,196,.25); border-radius:6px;
+  font-size:.5rem; color:var(--az); letter-spacing:.08em; }
+.zoom-hint.show { display:flex; }
+.zoom-reset { background:transparent; border:1px solid var(--az); border-radius:4px;
+  padding:2px 8px; font-family:'Share Tech Mono',monospace; font-size:.5rem;
+  color:var(--az); cursor:pointer; letter-spacing:.06em; }
+
+/* save row */
+.save { display:flex; gap:6px; margin-top:8px; }
+.sbtn { flex:1; display:flex; align-items:center; justify-content:center; gap:5px;
+  background:transparent; border:1px solid var(--border); border-radius:6px;
+  padding:9px 6px; font-family:'Share Tech Mono',monospace; font-size:.6rem;
+  letter-spacing:.06em; cursor:pointer; color:var(--dim); }
+
+/* settings */
+.sc { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:13px 14px; margin-bottom:10px; }
+.sc-title { font-family:'Orbitron',sans-serif; font-size:.62rem; font-weight:700; letter-spacing:.18em; color:var(--dim); margin-bottom:10px; }
+.sr { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.sr:last-child { margin-bottom:0; }
+.sl { font-size:.55rem; color:var(--dim); min-width:80px; line-height:1.5; }
+.sl strong { font-family:'Orbitron',sans-serif; font-size:.7rem; color:var(--az); display:block; }
+input[type=range] { -webkit-appearance:none; appearance:none; flex:1; height:4px; border-radius:2px; outline:none; cursor:pointer;
+  background:linear-gradient(90deg,var(--az) var(--p,20%),var(--border) var(--p,20%)); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:22px; height:22px; border-radius:50%; background:var(--az); border:2px solid var(--bg); box-shadow:0 0 8px var(--az); }
+.su { font-size:.6rem; color:var(--dim); min-width:24px; }
+.sinfo { font-size:.58rem; color:var(--dim); line-height:1.9; }
+.sinfo strong { color:var(--az); }
+.sep { border-top:1px solid var(--border); margin:8px 0; }
+
+/* toast */
+#toast { position:fixed; bottom:70px; left:50%; transform:translateX(-50%) translateY(12px);
+  background:var(--panel); border:1px solid var(--az); border-radius:6px;
+  padding:8px 18px; font-size:.62rem; color:var(--az); letter-spacing:.08em;
+  opacity:0; transition:all .3s; pointer-events:none; z-index:200; white-space:nowrap; }
+#toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <h1>SmartPhysics: Rotation Lab</h1>
+  <p class="hdr-sub">Gyroscope · Angular Velocity · Orientation</p>
+  <div class="pill" id="pill"><span class="dot"></span><span id="pillTxt">INIT</span></div>
+</div>
+
+<div class="banner" id="banner"><span id="bannerTxt"></span></div>
+
+<div class="tabs">
+  <button class="tab on" id="tab0">📈 PLOTS</button>
+  <button class="tab"    id="tab1">⚙ SETTINGS</button>
+</div>
+
+<div class="pages">
+
+  <!-- PLOTS PAGE -->
+  <div class="page on" id="page0">
+
+    <div class="ctrl">
+      <button class="btn-start" id="btnStart">
+        <span class="dot"></span><span id="btnLbl">START</span>
+      </button>
+      <button class="btn-clr">CLR</button>
+    </div>
+
+    <div class="strip">
+      <div class="st"><div class="st-l">Time</div><div class="st-v" id="sTime" style="color:var(--text)">—</div></div>
+      <div class="st"><div class="st-l">Samples</div><div class="st-v" id="sN" style="color:var(--text)">0</div></div>
+      <div class="st"><div class="st-l">φ now</div><div class="st-v" id="sPhi" style="color:var(--az)">—</div></div>
+      <div class="st"><div class="st-l">ωz now</div><div class="st-v" id="sWz" style="color:var(--wz)">—</div></div>
+    </div>
+
+    <!-- Angles(t): azimuth + pitch + roll -->
+    <div class="pc az">
+      <div class="pc-hdr">
+        <div><div class="pc-title">ANGLES vs TIME</div><div class="pc-sub">φ/β/γ(t) — orientation sensor</div></div>
+        <div class="ax">y: angle (rad)<br>x: t (s)</div>
+      </div>
+      <!-- Series toggles -->
+      <div class="toggle-row">
+        <div class="tog on" id="togPhi" onclick="toggleSeries('phi')" style="border-color:#00f5c4; color:#00f5c4;">
+          <span class="swatch" style="background:#00f5c4;"></span>φ AZIMUTH
+        </div>
+        <div class="tog on" id="togBeta" onclick="toggleSeries('beta')" style="border-color:#a78bfa; color:#a78bfa;">
+          <span class="swatch" style="background:#a78bfa;"></span>β PITCH
+        </div>
+        <div class="tog on" id="togGamma" onclick="toggleSeries('gamma')" style="border-color:#fb923c; color:#fb923c;">
+          <span class="swatch" style="background:#fb923c;"></span>γ ROLL
+        </div>
+      </div>
+      <canvas class="cv" id="cvAzT" height="170"></canvas>
+      <div class="zoom-hint" id="zoomHintAzT">🔍 ZOOMED · pinch/drag to explore &nbsp;<button class="zoom-reset" onclick="resetZoom('cvAzT')">RESET</button></div>
+      <div class="pc-stats">
+        <div class="ps"><div class="ps-l">φ now</div><div class="ps-v" id="azNow" style="color:#00f5c4">—</div></div>
+        <div class="ps"><div class="ps-l">β now</div><div class="ps-v" id="betaNow" style="color:#a78bfa">—</div></div>
+        <div class="ps"><div class="ps-l">γ now</div><div class="ps-v" id="gammaNow" style="color:#fb923c">—</div></div>
+      </div>
+      <div class="save">
+        <button class="sbtn" id="csvAzt">💾 CSV</button>
+        <button class="sbtn" id="pngAzt">🖼 PNG</button>
+      </div>
+    </div>
+
+    <!-- ω(t): wx + wy + wz -->
+    <div class="pc wz">
+      <div class="pc-hdr">
+        <div><div class="pc-title">ANGULAR VELOCITY vs TIME</div><div class="pc-sub">ω(t) — gyroscope axes</div></div>
+        <div class="ax">y: ω (r/s)<br>x: t (s)</div>
+      </div>
+      <!-- Series toggles -->
+      <div class="toggle-row">
+        <div class="tog on" id="togWx" onclick="toggleSeries('wx')" style="border-color:#00f5c4; color:#00f5c4;">
+          <span class="swatch" style="background:#00f5c4;"></span>ωx
+        </div>
+        <div class="tog on" id="togWy" onclick="toggleSeries('wy')" style="border-color:#facc15; color:#facc15;">
+          <span class="swatch" style="background:#facc15;"></span>ωy
+        </div>
+        <div class="tog on" id="togWz" onclick="toggleSeries('wz')" style="border-color:#ff5e5b; color:#ff5e5b;">
+          <span class="swatch" style="background:#ff5e5b;"></span>ωz
+        </div>
+      </div>
+      <canvas class="cv" id="cvWzT" height="170"></canvas>
+      <div class="zoom-hint" id="zoomHintWzT">🔍 ZOOMED · pinch/drag to explore &nbsp;<button class="zoom-reset" onclick="resetZoom('cvWzT')">RESET</button></div>
+      <div class="pc-stats">
+        <div class="ps"><div class="ps-l">ωx now</div><div class="ps-v" id="wxNow" style="color:#00f5c4">—</div></div>
+        <div class="ps"><div class="ps-l">ωy now</div><div class="ps-v" id="wyNow" style="color:#facc15">—</div></div>
+        <div class="ps"><div class="ps-l">ωz now</div><div class="ps-v" id="wzNow" style="color:#ff5e5b">—</div></div>
+      </div>
+      <div class="save">
+        <button class="sbtn" id="csvWzt">💾 CSV</button>
+        <button class="sbtn" id="pngWzt">🖼 PNG</button>
+      </div>
+    </div>
+
+  </div><!-- end page0 -->
+
+  <!-- SETTINGS PAGE -->
+  <div class="page" id="page1">
+
+    <div class="sc">
+      <div class="sc-title">RECORDING</div>
+      <div class="sr">
+        <div class="sl">Buffer<br><strong id="bufV">500</strong></div>
+        <input type="range" id="slBuf" min="100" max="5000" step="100" value="500" oninput="setBuf(this)">
+        <span class="su">pts</span>
+      </div>
+      <div class="sr">
+        <div class="sl">Rate<br><strong id="rateV">50</strong></div>
+        <input type="range" id="slRate" min="5" max="100" step="5" value="50" oninput="setRate(this)">
+        <span class="su">Hz</span>
+      </div>
+    </div>
+
+    <div class="sc">
+      <div class="sc-title">SENSOR SOURCES</div>
+      <div class="sinfo">
+        <div>📐 <strong>φ (azimuth)</strong> — DeviceOrientationEvent.alpha<br>
+          <span style="font-size:.5rem;opacity:.7;padding-left:18px;">Compass heading 0–360° → radians</span></div>
+        <div style="margin-top:6px;">📐 <strong style="color:#a78bfa">β (pitch)</strong> — DeviceOrientationEvent.beta<br>
+          <span style="font-size:.5rem;opacity:.7;padding-left:18px;">Front/back tilt –180°–180° → radians</span></div>
+        <div style="margin-top:6px;">📐 <strong style="color:#fb923c">γ (roll)</strong> — DeviceOrientationEvent.gamma<br>
+          <span style="font-size:.5rem;opacity:.7;padding-left:18px;">Left/right tilt –90°–90° → radians</span></div>
+        <div style="margin-top:6px;">🌀 <strong>ωx</strong> — DeviceMotionEvent.rotationRate.beta<br>
+          <span style="font-size:.5rem;opacity:.7;padding-left:18px;">Gyroscope x-axis °/s → rad/s</span></div>
+        <div style="margin-top:6px;">🌀 <strong style="color:#facc15">ωy</strong> — DeviceMotionEvent.rotationRate.gamma<br>
+          <span style="font-size:.5rem;opacity:.7;padding-left:18px;">Gyroscope y-axis °/s → rad/s</span></div>
+        <div style="margin-top:6px;">🌀 <strong style="color:#ff5e5b">ωz</strong> — DeviceMotionEvent.rotationRate.alpha<br>
+          <span style="font-size:.5rem;opacity:.7;padding-left:18px;">Gyroscope z-axis °/s → rad/s</span></div>
+        <div class="sep"></div>
+        <div>Sensor Hz: <strong id="sHz">—</strong></div>
+        <div>Orientation: <strong id="sOrient">—</strong></div>
+        <div class="sep"></div>
+        <div style="font-size:.52rem;opacity:.75;line-height:1.8;">
+          ⚠️ Requires a <strong>physical mobile device</strong> and <strong>HTTPS</strong>.<br>
+          On iOS: tap START → allow the system permission dialog.<br>
+          On Android: sensors connect automatically.
+        </div>
+      </div>
+    </div>
+
+    <div class="sc">
+      <div class="sc-title">HOW TO USE</div>
+      <div class="sinfo" style="line-height:1.9;">
+        <strong>START</strong> → begins recording + live plots.<br>
+        <strong>PAUSE</strong> → freezes plots, data is kept.<br>
+        <strong>RESUME</strong> → continues adding data.<br>
+        <strong>CLR</strong> → wipes all data, resets plots.<br>
+        Each plot has series toggles and <strong>CSV</strong>/<strong>PNG</strong> export.<br>
+        <strong>PINCH</strong> on a plot (while paused) to zoom in/out.<br>
+        <strong>DRAG</strong> (1 finger, while paused) to pan.<br>
+        <strong>DOUBLE-TAP</strong> or tap RESET to return to auto-scale.<br>
+        Zoom resets automatically when you resume recording.
+      </div>
+    </div>
+
+  </div><!-- end page1 -->
+
+</div><!-- pages -->
+<div id="toast"></div>
+
+<script>
+// ── Data & state ───────────────────────────────────────────────
+var D = { t:[], phi:[], beta:[], gamma:[], wx:[], wy:[], wz:[] };
+var recording   = false;
+var sensorLive  = false;
+var iosPerm     = false;
+var livePhi     = null;
+var liveBeta    = null;
+var liveGamma   = null;
+var liveWx      = null;
+var liveWy      = null;
+var liveWz      = null;
+var t0          = null;
+var lastSample  = 0;
+var maxBuf      = 500;
+var targetHz    = 50;
+var hzBuf       = [];
+var currentTab  = 0;
+var lastDraw    = 0;
+
+// Series visibility state
+var seriesOn = { phi:true, beta:true, gamma:true, wx:true, wy:true, wz:true };
+
+// ── Per-canvas zoom/pan state ──────────────────────────────────
+// Each entry: { xMin, xMax, yMin, yMax } in data-space, or null = auto
+var zoomState = { cvAzT: null, cvWzT: null };
+
+// Touch interaction state per canvas
+var touchState = {};
+
+function initCanvasTouch(canvasId) {
+  var cv = document.getElementById(canvasId);
+  if (!cv) return;
+
+  var ts = { pinching: false, lastDist: 0, lastMidX: 0, lastMidY: 0, lastTap: 0,
+             panStartX: undefined, panStartY: undefined };
+  touchState[canvasId] = ts;
+
+  // Margins — must match drawMultiXY exactly
+  var Pl = 44, Pr = 10, Pt = 12, Pb = 28;
+
+  // Convert a CSS-pixel position (relative to canvas element) to canvas buffer pixels.
+  // cv.width is set by getCanvas() to clientWidth-26, so scale ≈ 1 on normal screens.
+  // On hi-DPI we keep cv.width = clientWidth-26 (not devicePixelRatio scaled), so
+  // the ratio is simply cv.width / cv.getBoundingClientRect().width.
+  function cssToCanvasPx(cssX, cssY) {
+    var rect = cv.getBoundingClientRect();
+    var sx = cv.width  / rect.width;
+    var sy = cv.height / rect.height;
+    return [cssX * sx, cssY * sy];
+  }
+
+  // Get the current data range (zoomed or auto-fit).
+  function getCurrentRange() {
+    var z = zoomState[canvasId];
+    if (z) return [z.xMin, z.xMax, z.yMin, z.yMax];
+
+    // Compute auto range from live data
+    var xArr = D.t;
+    var arrs = (canvasId === 'cvAzT')
+      ? [seriesOn.phi?D.phi:null, seriesOn.beta?D.beta:null, seriesOn.gamma?D.gamma:null]
+      : [seriesOn.wx?D.wx:null,   seriesOn.wy?D.wy:null,     seriesOn.wz?D.wz:null];
+    arrs = arrs.filter(function(a){ return a && a.length >= 2; });
+    if (xArr.length < 2 || arrs.length === 0) return [0, 1, -1, 1];
+    var xMn = Math.min.apply(null, xArr), xMx = Math.max.apply(null, xArr);
+    var yMn = Infinity, yMx = -Infinity;
+    arrs.forEach(function(a){
+      yMn = Math.min(yMn, Math.min.apply(null, a));
+      yMx = Math.max(yMx, Math.max.apply(null, a));
+    });
+    var yR = yMx - yMn || 1;
+    yMn -= yR * .12; yMx += yR * .12;
+    return [xMn, xMx, yMn, yMx];
+  }
+
+  // Map a canvas-buffer pixel (px,py) to data coordinates given the current range.
+  function bufPxToData(px, py, range) {
+    var W = cv.width, H = cv.height;
+    var pw = W - Pl - Pr, ph = H - Pt - Pb;
+    var xMn=range[0], xMx=range[1], yMn=range[2], yMx=range[3];
+    var dataX = xMn + ((px - Pl) / pw) * (xMx - xMn);
+    var dataY = yMn + (1 - (py - Pt) / ph) * (yMx - yMn);
+    return [dataX, dataY];
+  }
+
+  // Zoom: scale around the canvas-buffer pivot point (pivX, pivY).
+  // Pan: shift by (dCssX, dCssY) CSS pixels.
+  function applyPan(dCssX, dCssY) {
+    var range = getCurrentRange();
+    var W = cv.width, H = cv.height;
+    var rect = cv.getBoundingClientRect();
+    var sx = cv.width  / rect.width;
+    var sy = cv.height / rect.height;
+    var dBufX = dCssX * sx, dBufY = dCssY * sy;
+    var pw = W - Pl - Pr, ph = H - Pt - Pb;
+    var xR = range[1] - range[0], yR = range[3] - range[2];
+    var dDataX =  dBufX / pw * xR;
+    var dDataY = -dBufY / ph * yR;
+    zoomState[canvasId] = {
+      xMin: range[0] - dDataX, xMax: range[1] - dDataX,
+      yMin: range[2] - dDataY, yMax: range[3] - dDataY
+    };
+    redrawAll();
+  }
+
+  // Helper: CSS-pixel position of a touch relative to the canvas element.
+  function touchCssPos(touch) {
+    var rect = cv.getBoundingClientRect();
+    return [touch.clientX - rect.left, touch.clientY - rect.top];
+  }
+
+  // Helper: midpoint and distance between two touches in CSS pixels.
+  // Returns midpoint and independent X/Y spans between two touches (CSS px).
+  // Returns midpoint + total distance between two touches (CSS px).
+  function twoTouchInfo(t1, t2) {
+    var p1 = touchCssPos(t1), p2 = touchCssPos(t2);
+    var dx = p2[0] - p1[0], dy = p2[1] - p1[1];
+    return {
+      midX:  (p1[0] + p2[0]) / 2,
+      midY:  (p1[1] + p2[1]) / 2,
+      dist:  Math.sqrt(dx*dx + dy*dy),
+      dx: dx, dy: dy
+    };
+  }
+
+  cv.addEventListener('touchstart', function(e) {
+    if (recording) { toast('Pause first to zoom/pan'); return; }
+
+    var now = Date.now();
+    // Double-tap resets zoom
+    if (e.touches.length === 1 && (now - ts.lastTap) < 300) {
+      zoomState[canvasId] = null;
+      redrawAll();
+      toast('Zoom reset');
+      ts.lastTap = 0;
+      e.preventDefault();
+      return;
+    }
+    if (e.touches.length === 1) ts.lastTap = now;
+
+    if (e.touches.length >= 2) {
+      ts.pinching = true;
+      var info = twoTouchInfo(e.touches[0], e.touches[1]);
+      // Snapshot the range and pivot at the moment fingers touch down.
+      // All zoom during this pinch gesture is relative to this baseline.
+      ts.pinchRange  = getCurrentRange();
+      ts.pinchMidX   = info.midX;
+      ts.pinchMidY   = info.midY;
+      ts.pinchDist   = info.dist;
+      ts.pinchDistX  = Math.abs(info.dx);
+      ts.pinchDistY  = Math.abs(info.dy);
+      // Determine axis lock from initial finger angle.
+      // angle = 0° = perfectly horizontal, 90° = perfectly vertical
+      var angle = Math.abs(Math.atan2(Math.abs(info.dy), Math.abs(info.dx)) * 180 / Math.PI);
+      // <30° from horizontal → X only; <30° from vertical → Y only; else both
+      if (angle < 30)       ts.pinchAxis = 'x';
+      else if (angle > 60)  ts.pinchAxis = 'y';
+      else                  ts.pinchAxis = 'xy';
+      // Current midpoint (for pan tracking)
+      ts.lastMidX = info.midX; ts.lastMidY = info.midY;
+    } else {
+      ts.pinching = false;
+      var p = touchCssPos(e.touches[0]);
+      ts.panStartX = p[0]; ts.panStartY = p[1];
+    }
+    e.preventDefault();
+  }, { passive: false });
+
+  cv.addEventListener('touchmove', function(e) {
+    if (recording) return;
+    e.preventDefault();
+
+    if (e.touches.length >= 2) {
+      ts.pinching = true;
+      var info = twoTouchInfo(e.touches[0], e.touches[1]);
+
+      // Use the baseline range captured at touchstart — no compounding per-frame errors.
+      var range  = ts.pinchRange;
+      var buf    = cssToCanvasPx(ts.pinchMidX, ts.pinchMidY);
+      var pivot  = bufPxToData(buf[0], buf[1], range);
+      var px = pivot[0], py = pivot[1];
+
+      // Scale relative to the baseline distance at pinch start (stable, not frame-to-frame).
+      var MIN = 20; // minimum baseline span in px to avoid divide-by-near-zero
+      var distX = Math.abs(info.dx), distY = Math.abs(info.dy);
+
+      var scaleX = 1, scaleY = 1;
+      if (ts.pinchAxis === 'x' || ts.pinchAxis === 'xy') {
+        scaleX = Math.max(0.05, Math.min(40, distX / Math.max(ts.pinchDistX, MIN)));
+      }
+      if (ts.pinchAxis === 'y' || ts.pinchAxis === 'xy') {
+        scaleY = Math.max(0.05, Math.min(40, distY / Math.max(ts.pinchDistY, MIN)));
+      }
+
+      // Pan: midpoint drift from the pinch-start position
+      var rect2 = cv.getBoundingClientRect();
+      var pw = cv.width - Pl - Pr, ph = cv.height - Pt - Pb;
+      var xR = range[1] - range[0], yR = range[3] - range[2];
+      var sx = cv.width / rect2.width, sy = cv.height / rect2.height;
+      var dDataX =  (info.midX - ts.pinchMidX) * sx / pw * xR;
+      var dDataY = -(info.midY - ts.pinchMidY) * sy / ph * yR;
+
+      zoomState[canvasId] = {
+        xMin: px + (range[0] - px) / scaleX - dDataX,
+        xMax: px + (range[1] - px) / scaleX - dDataX,
+        yMin: py + (range[2] - py) / scaleY - dDataY,
+        yMax: py + (range[3] - py) / scaleY - dDataY
+      };
+      redrawAll();
+
+    } else if (e.touches.length === 1 && !ts.pinching) {
+      var p = touchCssPos(e.touches[0]);
+      if (ts.panStartX !== undefined) applyPan(p[0] - ts.panStartX, p[1] - ts.panStartY);
+      ts.panStartX = p[0]; ts.panStartY = p[1];
+    }
+  }, { passive: false });
+
+  cv.addEventListener('touchend', function(e) {
+    if (e.touches.length < 2) {
+      ts.pinching   = false;
+      ts.pinchRange = null;
+    }
+    if (e.touches.length === 1) {
+      var p = touchCssPos(e.touches[0]);
+      ts.panStartX = p[0]; ts.panStartY = p[1];
+    }
+  }, { passive: false });
+}
+
+function toggleSeries(name) {
+  seriesOn[name] = !seriesOn[name];
+  var el = document.getElementById('tog' + name.charAt(0).toUpperCase() + name.slice(1));
+  if (el) el.classList.toggle('on', seriesOn[name]);
+  redrawAll();
+}
+
+// ── Tab switching ──────────────────────────────────────────────
+function showTab(n) {
+  currentTab = n;
+  document.getElementById('page0').classList.toggle('on', n === 0);
+  document.getElementById('page1').classList.toggle('on', n === 1);
+  document.getElementById('tab0').classList.toggle('on', n === 0);
+  document.getElementById('tab1').classList.toggle('on', n === 1);
+  if (n === 0) { setTimeout(redrawAll, 50); }
+}
+
+// ── Sensor init ────────────────────────────────────────────────
+function initSensors() {
+  if (typeof DeviceOrientationEvent === 'undefined') {
+    setPill('err', 'N/A');
+    showBanner('No orientation sensor found. Open this page on a physical smartphone.');
+    return;
+  }
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    iosPerm = true;
+    setPill('', 'TAP START');
+    showBanner('iOS: tap START to allow sensor access.');
+    return;
+  }
+  doAttach();
+}
+
+function doAttach() {
+  window.addEventListener('deviceorientation', onOrient, true);
+  window.addEventListener('devicemotion',      onMotion,  true);
+  sensorLive = true;
+  setPill('live', 'LIVE');
+  hideBanner();
+  setTimeout(function() {
+    if (livePhi === null) {
+      showBanner('Sensor attached but no data received. Try moving your device, or check that you are on HTTPS.');
+    }
+  }, 3000);
+}
+
+function doIosPermission() {
+  DeviceOrientationEvent.requestPermission()
+    .then(function(s) {
+      if (s === 'granted') {
+        if (typeof DeviceMotionEvent.requestPermission === 'function') {
+          DeviceMotionEvent.requestPermission()
+            .then(function() { doAttach(); })
+            .catch(function() { doAttach(); });
+        } else {
+          doAttach();
+        }
+        startRecording();
+      } else {
+        setPill('err', 'DENIED');
+        showBanner('Permission denied. Go to Settings → Safari → Motion & Orientation Access and turn it on.');
+      }
+    })
+    .catch(function(e) {
+      setPill('err', 'ERROR');
+      showBanner('Permission error: ' + e.message);
+    });
+}
+
+// ── Sensor handlers ────────────────────────────────────────────
+function onOrient(e) {
+  if (e.alpha == null) return;
+  livePhi   = e.alpha * Math.PI / 180;
+  liveBeta  = e.beta  != null ? e.beta  * Math.PI / 180 : 0;
+  liveGamma = e.gamma != null ? e.gamma * Math.PI / 180 : 0;
+
+  var now = performance.now();
+  hzBuf.push(now);
+  if (hzBuf.length > 40) hzBuf.shift();
+  if (hzBuf.length > 2) {
+    var hz = (hzBuf.length - 1) / ((hzBuf[hzBuf.length-1] - hzBuf[0]) / 1000);
+    var el = document.getElementById('sHz');
+    if (el) el.textContent = hz.toFixed(1) + ' Hz';
+  }
+
+  if (!recording) return;
+  if (now - lastSample < 1000 / targetHz) return;
+  lastSample = now;
+
+  if (t0 === null) t0 = now;
+
+  D.t.push((now - t0) / 1000);
+  D.phi.push(livePhi);
+  D.beta.push(liveBeta);
+  D.gamma.push(liveGamma);
+  D.wx.push(liveWx !== null ? liveWx : 0);
+  D.wy.push(liveWy !== null ? liveWy : 0);
+  D.wz.push(liveWz !== null ? liveWz : 0);
+
+  if (D.t.length > maxBuf) {
+    D.t.shift(); D.phi.shift(); D.beta.shift(); D.gamma.shift();
+    D.wx.shift(); D.wy.shift(); D.wz.shift();
+  }
+}
+
+function onMotion(e) {
+  var rr = e.rotationRate;
+  if (rr) {
+    if (rr.alpha != null) liveWz = rr.alpha * Math.PI / 180;
+    if (rr.beta  != null) liveWx = rr.beta  * Math.PI / 180;
+    if (rr.gamma != null) liveWy = rr.gamma * Math.PI / 180;
+  }
+}
+
+// ── Start / Pause / Resume / Clear ────────────────────────────
+function onStart() {
+  if (iosPerm && !sensorLive) { doIosPermission(); return; }
+  if (!sensorLive) { showBanner('Sensor not ready yet. Check the message above.'); return; }
+  if (!recording) { startRecording(); } else { pauseRecording(); }
+}
+
+function startRecording() {
+  if (D.t.length === 0) { t0 = null; lastSample = 0; }
+  // Clear zoom so live view auto-scales freely
+  zoomState.cvAzT = null;
+  zoomState.cvWzT = null;
+  recording = true;
+  var b = document.getElementById('btnStart');
+  b.className = 'btn-start running';
+  document.getElementById('btnLbl').textContent = 'PAUSE';
+  toast('Recording…');
+}
+
+function pauseRecording() {
+  recording = false;
+  var b = document.getElementById('btnStart');
+  b.className = 'btn-start paused';
+  document.getElementById('btnLbl').textContent = 'RESUME';
+  toast('Paused — ' + D.t.length + ' samples');
+}
+
+function onClear() {
+  recording = false;
+  D = { t:[], phi:[], beta:[], gamma:[], wx:[], wy:[], wz:[] };
+  t0 = null; lastSample = 0;
+  var b = document.getElementById('btnStart');
+  b.className = 'btn-start';
+  document.getElementById('btnLbl').textContent = 'START';
+  redrawAll();
+  updateStrip();
+  toast('Cleared');
+}
+
+// ── Render loop ────────────────────────────────────────────────
+function loop(ts) {
+  requestAnimationFrame(loop);
+  var interval = recording ? 80 : 400;
+  if (ts - lastDraw < interval) return;
+  lastDraw = ts;
+  updateStrip();
+  if (currentTab === 0) redrawAll();
+  var o = document.getElementById('sOrient');
+  if (o) o.textContent = (screen.orientation && screen.orientation.type) || '—';
+}
+
+// ── Stats strip ────────────────────────────────────────────────
+function updateStrip() {
+  var n = D.t.length;
+  setText('sN',    n);
+  setText('sTime', n > 0 ? D.t[n-1].toFixed(1)+'s' : '—');
+  setText('sPhi',  livePhi  !== null ? livePhi.toFixed(2)  : '—');
+  setText('sWz',   liveWz   !== null ? liveWz.toFixed(2)   : '—');
+  // per-series live readouts
+  setText('azNow',    livePhi   !== null ? livePhi.toFixed(2)   : '—');
+  setText('betaNow',  liveBeta  !== null ? liveBeta.toFixed(2)  : '—');
+  setText('gammaNow', liveGamma !== null ? liveGamma.toFixed(2) : '—');
+  setText('wxNow',    liveWx    !== null ? liveWx.toFixed(2)    : '—');
+  setText('wyNow',    liveWy    !== null ? liveWy.toFixed(2)    : '—');
+  setText('wzNow',    liveWz    !== null ? liveWz.toFixed(2)    : '—');
+}
+
+function setText(id, v) { var e=document.getElementById(id); if(e) e.textContent = v; }
+
+function resetZoom(id) {
+  zoomState[id] = null;
+  redrawAll();
+  toast('Zoom reset');
+}
+
+function updateZoomHints() {
+  var hAz = document.getElementById('zoomHintAzT');
+  var hWz = document.getElementById('zoomHintWzT');
+  if (hAz) hAz.classList.toggle('show', !!zoomState['cvAzT']);
+  if (hWz) hWz.classList.toggle('show', !!zoomState['cvWzT']);
+}
+
+// ── Drawing ────────────────────────────────────────────────────
+function redrawAll() {
+  // Angles plot: phi, beta, gamma
+  var angleSeries = [];
+  if (seriesOn.phi)   angleSeries.push({ arr: D.phi,   color:'#00f5c4', glow:'rgba(0,245,196,.12)',   label:'φ' });
+  if (seriesOn.beta)  angleSeries.push({ arr: D.beta,  color:'#a78bfa', glow:'rgba(167,139,250,.12)', label:'β' });
+  if (seriesOn.gamma) angleSeries.push({ arr: D.gamma, color:'#fb923c', glow:'rgba(251,146,60,.12)',  label:'γ' });
+  drawMultiXY('cvAzT', D.t, angleSeries, 't (s)', 'angle (rad)');
+
+  // Omega plot: wx, wy, wz
+  var omegaSeries = [];
+  if (seriesOn.wx) omegaSeries.push({ arr: D.wx, color:'#00f5c4', glow:'rgba(0,245,196,.12)',   label:'ωx' });
+  if (seriesOn.wy) omegaSeries.push({ arr: D.wy, color:'#facc15', glow:'rgba(250,204,21,.12)',  label:'ωy' });
+  if (seriesOn.wz) omegaSeries.push({ arr: D.wz, color:'#ff5e5b', glow:'rgba(255,94,91,.12)',   label:'ωz' });
+  drawMultiXY('cvWzT', D.t, omegaSeries, 't (s)', 'ω (r/s)');
+  updateZoomHints();
+}
+
+function getCanvas(id) {
+  var cv = document.getElementById(id);
+  if (!cv) return null;
+  var w = cv.parentElement ? cv.parentElement.clientWidth - 26 : 300;
+  if (w < 50) w = 300;
+  cv.width  = w;
+  cv.height = 170;
+  return cv;
+}
+
+/**
+ * Draw multiple series on one canvas.
+ * series: [{arr, color, glow, label}]
+ */
+function drawMultiXY(id, xArr, series, xl, yl) {
+  var cv = getCanvas(id); if (!cv) return;
+  var ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
+  var Pl = 44, Pr = 10, Pt = 12, Pb = 28;
+  var pw = W-Pl-Pr, ph = H-Pt-Pb;
+
+  ctx.fillStyle = '#0a1520'; ctx.fillRect(0,0,W,H);
+
+  // Filter to series that have data
+  var activeSeries = series.filter(function(s){ return s.arr && s.arr.length >= 2; });
+
+  if (xArr.length < 2 || activeSeries.length === 0) {
+    ctx.fillStyle = 'rgba(150,190,220,.8)';
+    ctx.font = 'bold 13px Share Tech Mono';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(recording ? '⏳ Collecting…' : '▶  Press START', W/2, H/2);
+    return;
+  }
+
+  // Use zoom state if available, otherwise auto-range
+  var z = zoomState[id];
+  var xMn, xMx, yMn, yMx;
+  if (z) {
+    xMn = z.xMin; xMx = z.xMax; yMn = z.yMin; yMx = z.yMax;
+  } else {
+    xMn = Math.min.apply(null, xArr); xMx = Math.max.apply(null, xArr);
+    yMn = Infinity; yMx = -Infinity;
+    activeSeries.forEach(function(s) {
+      yMn = Math.min(yMn, Math.min.apply(null, s.arr));
+      yMx = Math.max(yMx, Math.max.apply(null, s.arr));
+    });
+    var yR = yMx - yMn || 1;
+    yMn -= yR * .12; yMx += yR * .12;
+  }
+  var xR  = xMx - xMn || 1;
+
+  // grid
+  ctx.strokeStyle = 'rgba(37,61,94,.9)'; ctx.lineWidth = 1;
+  for (var i=0;i<=4;i++) { var x=Pl+(i/4)*pw; ctx.beginPath(); ctx.moveTo(x,Pt); ctx.lineTo(x,Pt+ph); ctx.stroke(); }
+  for (var j=0;j<=3;j++) { var y=Pt+(j/3)*ph; ctx.beginPath(); ctx.moveTo(Pl,y); ctx.lineTo(Pl+pw,y); ctx.stroke(); }
+
+  // zero line
+  if (yMn < 0 && yMx > 0) {
+    var y0 = Pt+ph*(1-(0-yMn)/(yMx-yMn));
+    ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.setLineDash([4,6]);
+    ctx.beginPath(); ctx.moveTo(Pl,y0); ctx.lineTo(Pl+pw,y0); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // axis labels
+  ctx.fillStyle='rgba(106,143,175,.9)'; ctx.font='9px Share Tech Mono';
+  ctx.textAlign='center'; ctx.textBaseline='top';
+  for (var i=0;i<=4;i++) ctx.fillText(fmt(xMn+(i/4)*xR), Pl+(i/4)*pw, Pt+ph+4);
+  ctx.textAlign='right'; ctx.textBaseline='middle';
+  for (var j=0;j<=3;j++) ctx.fillText(fmt(yMx-(j/3)*(yMx-yMn)), Pl-4, Pt+(j/3)*ph);
+  ctx.fillStyle='rgba(106,143,175,.6)'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+  ctx.fillText(xl, Pl+pw/2, H);
+  ctx.save(); ctx.translate(10,Pt+ph/2); ctx.rotate(-Math.PI/2); ctx.textBaseline='middle'; ctx.fillText(yl,0,0); ctx.restore();
+
+  var tX = function(v){return Pl+((v-xMn)/xR)*pw;};
+  var tY = function(v){return Pt+ph*(1-(v-yMn)/(yMx-yMn));};
+
+  // Clip all curve drawing to the plot area so zoomed data is cut cleanly at edges
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(Pl, Pt, pw, ph);
+  ctx.clip();
+
+  // Draw each series: glow then line then dot
+  activeSeries.forEach(function(s) {
+    var n = Math.min(xArr.length, s.arr.length);
+    // glow
+    ctx.beginPath(); ctx.strokeStyle=s.glow; ctx.lineWidth=7;
+    for (var i=0;i<n;i++) i===0?ctx.moveTo(tX(xArr[i]),tY(s.arr[i])):ctx.lineTo(tX(xArr[i]),tY(s.arr[i]));
+    ctx.stroke();
+    // line
+    ctx.beginPath(); ctx.strokeStyle=s.color; ctx.lineWidth=2;
+    for (var i=0;i<n;i++) i===0?ctx.moveTo(tX(xArr[i]),tY(s.arr[i])):ctx.lineTo(tX(xArr[i]),tY(s.arr[i]));
+    ctx.stroke();
+    // dot at latest point — only if within visible range
+    var lpx = tX(xArr[n-1]), lpy = tY(s.arr[n-1]);
+    if (lpx >= Pl && lpx <= Pl+pw && lpy >= Pt && lpy <= Pt+ph) {
+      ctx.beginPath(); ctx.arc(lpx, lpy, 4, 0, 2*Math.PI); ctx.fillStyle=s.color; ctx.fill();
+    }
+  });
+
+  ctx.restore(); // end clip region
+
+  // Legend (small, top-right corner)
+  var lx = Pl+pw-4, ly = Pt+6;
+  activeSeries.forEach(function(s) {
+    ctx.beginPath(); ctx.strokeStyle=s.color; ctx.lineWidth=2;
+    ctx.moveTo(lx-22, ly); ctx.lineTo(lx-10, ly); ctx.stroke();
+    ctx.fillStyle=s.color; ctx.font='8px Share Tech Mono'; ctx.textAlign='right'; ctx.textBaseline='middle';
+    ctx.fillText(s.label, lx, ly);
+    ly += 13;
+  });
+}
+
+function fmt(v) { return Math.abs(v)>=100?v.toFixed(0):Math.abs(v)>=10?v.toFixed(1):v.toFixed(2); }
+
+// ── Save ───────────────────────────────────────────────────────
+function doCSV(type) {
+  if (D.t.length < 2) { toast('No data yet'); return; }
+  var ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,16);
+  var csv, fname;
+  if (type === 'azt') {
+    csv = 'time_s,azimuth_rad,pitch_rad,roll_rad\n' +
+      D.t.map(function(t,i){
+        return t.toFixed(5)+','+D.phi[i].toFixed(6)+','+D.beta[i].toFixed(6)+','+D.gamma[i].toFixed(6);
+      }).join('\n');
+    fname = 'angles_vs_time_'+ts+'.csv';
+  } else {
+    csv = 'time_s,omega_x_rad_s,omega_y_rad_s,omega_z_rad_s\n' +
+      D.t.map(function(t,i){
+        return t.toFixed(5)+','+D.wx[i].toFixed(6)+','+D.wy[i].toFixed(6)+','+D.wz[i].toFixed(6);
+      }).join('\n');
+    fname = 'omega_vs_time_'+ts+'.csv';
+  }
+  dlBlob(new Blob([csv],{type:'text/csv'}), fname);
+  toast('CSV saved');
+}
+
+function doPNG(type) {
+  if (D.t.length < 2) { toast('No data yet'); return; }
+  var W=900, H=320, off=document.createElement('canvas');
+  off.width=W; off.height=H;
+  var ctx=off.getContext('2d');
+  var ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,16);
+  var fname=(type==='azt'?'angles_vs_time':'omega_vs_time')+'_'+ts+'.png';
+
+  if (type === 'azt') {
+    var series = [];
+    if (seriesOn.phi)   series.push({ arr: D.phi,   color:'#00f5c4', glow:'rgba(0,245,196,.12)',   label:'φ' });
+    if (seriesOn.beta)  series.push({ arr: D.beta,  color:'#a78bfa', glow:'rgba(167,139,250,.12)', label:'β' });
+    if (seriesOn.gamma) series.push({ arr: D.gamma, color:'#fb923c', glow:'rgba(251,146,60,.12)',  label:'γ' });
+    hrRenderMulti(ctx, W, H, D.t, series, 't (s)', 'angle (rad)');
+  } else {
+    var series = [];
+    if (seriesOn.wx) series.push({ arr: D.wx, color:'#00f5c4', glow:'rgba(0,245,196,.12)',   label:'ωx' });
+    if (seriesOn.wy) series.push({ arr: D.wy, color:'#facc15', glow:'rgba(250,204,21,.12)',  label:'ωy' });
+    if (seriesOn.wz) series.push({ arr: D.wz, color:'#ff5e5b', glow:'rgba(255,94,91,.12)',   label:'ωz' });
+    hrRenderMulti(ctx, W, H, D.t, series, 't (s)', 'ω (r/s)');
+  }
+
+  ctx.fillStyle='rgba(106,143,175,.5)'; ctx.font='10px monospace'; ctx.textAlign='left'; ctx.textBaseline='bottom';
+  ctx.fillText('SmartPhysics: Rotation Lab  |  '+D.t.length+' samples  |  '+new Date().toLocaleString(), 8, H-2);
+  off.toBlob(function(b){ dlBlob(b,fname); toast('PNG saved'); },'image/png');
+}
+
+function hrRenderMulti(ctx, W, H, xArr, series, xl, yl) {
+  var Pl=58,Pr=14,Pt=18,Pb=40, pw=W-Pl-Pr, ph=H-Pt-Pb;
+  ctx.fillStyle='#0a1520'; ctx.fillRect(0,0,W,H);
+  var n = xArr.length; if(n<2) return;
+  var activeSeries = series.filter(function(s){ return s.arr && s.arr.length >= 2; });
+  if (activeSeries.length === 0) return;
+
+  var xMn=Math.min.apply(null,xArr), xMx=Math.max.apply(null,xArr);
+  var xR=xMx-xMn||1;
+  var yMn=Infinity, yMx=-Infinity;
+  activeSeries.forEach(function(s){
+    yMn=Math.min(yMn,Math.min.apply(null,s.arr));
+    yMx=Math.max(yMx,Math.max.apply(null,s.arr));
+  });
+  var yR=yMx-yMn||1; yMn-=yR*.12; yMx+=yR*.12;
+
+  ctx.strokeStyle='rgba(37,61,94,.8)'; ctx.lineWidth=1;
+  for(var i=0;i<=5;i++){var x=Pl+(i/5)*pw;ctx.beginPath();ctx.moveTo(x,Pt);ctx.lineTo(x,Pt+ph);ctx.stroke();}
+  for(var j=0;j<=4;j++){var y=Pt+(j/4)*ph;ctx.beginPath();ctx.moveTo(Pl,y);ctx.lineTo(Pl+pw,y);ctx.stroke();}
+  ctx.fillStyle='rgba(106,143,175,.8)'; ctx.font='12px Share Tech Mono';
+  ctx.textAlign='center'; ctx.textBaseline='top';
+  for(var i=0;i<=5;i++) ctx.fillText(fmt(xMn+(i/5)*xR),Pl+(i/5)*pw,Pt+ph+6);
+  ctx.textAlign='right'; ctx.textBaseline='middle';
+  for(var j=0;j<=4;j++) ctx.fillText(fmt(yMx-(j/4)*(yMx-yMn)),Pl-6,Pt+(j/4)*ph);
+  ctx.fillStyle='rgba(106,143,175,.6)'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+  ctx.fillText(xl,Pl+pw/2,H-18);
+  ctx.save();ctx.translate(16,Pt+ph/2);ctx.rotate(-Math.PI/2);ctx.textBaseline='middle';ctx.fillText(yl,0,0);ctx.restore();
+
+  var tX=function(v){return Pl+((v-xMn)/xR)*pw;};
+  var tY=function(v){return Pt+ph*(1-(v-yMn)/(yMx-yMn));};
+
+  activeSeries.forEach(function(s){
+    var sn=Math.min(n,s.arr.length);
+    ctx.beginPath();ctx.strokeStyle=s.glow;ctx.lineWidth=8;
+    for(var i=0;i<sn;i++) i===0?ctx.moveTo(tX(xArr[i]),tY(s.arr[i])):ctx.lineTo(tX(xArr[i]),tY(s.arr[i]));
+    ctx.stroke();
+    ctx.beginPath();ctx.strokeStyle=s.color;ctx.lineWidth=2.2;
+    for(var i=0;i<sn;i++) i===0?ctx.moveTo(tX(xArr[i]),tY(s.arr[i])):ctx.lineTo(tX(xArr[i]),tY(s.arr[i]));
+    ctx.stroke();
+  });
+}
+
+function dlBlob(b,name){var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;a.click();setTimeout(function(){URL.revokeObjectURL(a.href);},2000);}
+
+// ── Settings sliders ───────────────────────────────────────────
+function setBuf(el) {
+  maxBuf = +el.value;
+  document.getElementById('bufV').textContent = maxBuf;
+  el.style.setProperty('--p', ((maxBuf-100)/(5000-100)*100).toFixed(0)+'%');
+}
+function setRate(el) {
+  targetHz = +el.value;
+  document.getElementById('rateV').textContent = targetHz;
+  el.style.setProperty('--p', ((targetHz-5)/(100-5)*100).toFixed(0)+'%');
+}
+
+// ── Pill / banner / toast ──────────────────────────────────────
+function setPill(cls, lbl) {
+  document.getElementById('pill').className = 'pill' + (cls?' '+cls:'');
+  document.getElementById('pillTxt').textContent = lbl;
+}
+function showBanner(msg) {
+  document.getElementById('bannerTxt').textContent = msg;
+  document.getElementById('banner').classList.add('show');
+}
+function hideBanner() { document.getElementById('banner').classList.remove('show'); }
+var _tt;
+function toast(msg) {
+  var t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(_tt); _tt=setTimeout(function(){t.classList.remove('show');},2400);
+}
+
+// ── Init ───────────────────────────────────────────────────────
+window.addEventListener('load', function() {
+  setBuf(document.getElementById('slBuf'));
+  setRate(document.getElementById('slRate'));
+  initSensors();
+
+  document.getElementById('tab0').addEventListener('click', function(){ showTab(0); });
+  document.getElementById('tab1').addEventListener('click', function(){ showTab(1); });
+  document.getElementById('btnStart').addEventListener('click', function(){ onStart(); });
+  document.getElementById('btnStart').addEventListener('touchend', function(e){ e.preventDefault(); onStart(); });
+  document.querySelector('.btn-clr').addEventListener('click', function(){ onClear(); });
+
+  document.getElementById('csvAzt').addEventListener('click', function(){ doCSV('azt'); });
+  document.getElementById('pngAzt').addEventListener('click', function(){ doPNG('azt'); });
+  document.getElementById('csvWzt').addEventListener('click', function(){ doCSV('wzt'); });
+  document.getElementById('pngWzt').addEventListener('click', function(){ doPNG('wzt'); });
+
+  initCanvasTouch('cvAzT');
+  initCanvasTouch('cvWzT');
+
+  setTimeout(function() {
+    redrawAll();
+    requestAnimationFrame(loop);
+  }, 100);
+});
+
+window.addEventListener('resize', function() {
+  if (currentTab === 0) redrawAll();
+});
+</script>
+</body>
+</html>

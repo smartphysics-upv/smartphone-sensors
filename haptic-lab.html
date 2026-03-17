@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Haptic Lab — Vibration Controller</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c10; --panel: #0d1520; --border: #1a2f4a;
+    --vib1: #f97316; --vib2: #38bdf8; --vib3: #a78bfa;
+    --text: #c8dff0; --dim: #4a6a85;
+    --glow1: rgba(249,115,22,0.25); --glow2: rgba(56,189,248,0.22); --glow3: rgba(167,139,250,0.25);
+    --danger: #ff5e5b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh; padding: 1rem; overflow-x: hidden;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(249,115,22,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(249,115,22,0.025) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+  }
+  .container { position: relative; z-index: 1; max-width: 500px; margin: 0 auto; }
+
+  h1 {
+    font-family: 'Orbitron', sans-serif; font-weight: 900;
+    font-size: clamp(0.8rem, 4vw, 1.1rem); letter-spacing: 0.08em;
+    text-align: center; color: var(--vib1); text-shadow: 0 0 20px var(--glow1);
+    padding: 1rem 0 0.3rem;
+  }
+  .subtitle {
+    text-align: center; font-size: 0.65rem; color: var(--dim);
+    letter-spacing: 0.25em; text-transform: uppercase; margin-bottom: 1.5rem;
+  }
+
+  /* Support banner */
+  .support-banner {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.7rem 1rem; margin-bottom: 1rem;
+    display: flex; align-items: center; gap: 10px; font-size: 0.65rem;
+  }
+  .support-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .support-dot.ok { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+  .support-dot.no { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+  .support-dot.unknown { background: #facc15; box-shadow: 0 0 8px #facc15; }
+  .support-text { color: var(--text); }
+
+  /* Tab bar */
+  .tab-bar {
+    display: flex; gap: 0; margin-bottom: 1.2rem;
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  }
+  .tab-btn {
+    flex: 1; padding: 0.65rem 0; background: transparent;
+    font-family: 'Orbitron', sans-serif; font-size: 0.6rem; font-weight: 700;
+    letter-spacing: 0.12em; cursor: pointer; transition: all 0.2s;
+    color: var(--dim); border: none; border-right: 1px solid var(--border);
+  }
+  .tab-btn:last-child { border-right: none; }
+  .tab-btn.active-tab { background: var(--panel); color: var(--vib1); box-shadow: inset 0 -2px 0 var(--vib1); }
+  .tab-btn:not(.active-tab):hover { color: var(--text); background: rgba(255,255,255,0.03); }
+  .tab-pane { display: none; }
+  .tab-pane.visible { display: block; }
+
+  /* Cards */
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem; margin-bottom: 1rem;
+    position: relative; overflow: hidden;
+  }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+  .card.c1::before { background: linear-gradient(90deg, transparent, var(--vib1), transparent); }
+  .card.c2::before { background: linear-gradient(90deg, transparent, var(--vib2), transparent); }
+  .card.c3::before { background: linear-gradient(90deg, transparent, var(--vib3), transparent); }
+
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  .card-label { font-family: 'Orbitron', sans-serif; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.2em; }
+  .c1 .card-label { color: var(--vib1); }
+  .c2 .card-label { color: var(--vib2); }
+  .c3 .card-label { color: var(--vib3); }
+
+  .val-display { font-family: 'Orbitron', sans-serif; font-size: 1.4rem; font-weight: 700; letter-spacing: 0.04em; }
+  .c1 .val-display { color: var(--vib1); text-shadow: 0 0 14px var(--glow1); }
+  .c2 .val-display { color: var(--vib2); text-shadow: 0 0 14px var(--glow2); }
+  .c3 .val-display { color: var(--vib3); text-shadow: 0 0 14px var(--glow3); }
+  .val-unit { font-size: 0.65rem; color: var(--dim); margin-left: 3px; }
+
+  /* Sliders */
+  .slider-wrap { position: relative; margin: 0.5rem 0; }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 2px; outline: none; cursor: pointer; }
+  .c1 input[type=range] { background: linear-gradient(90deg, var(--vib1) var(--pct, 50%), var(--border) var(--pct, 50%)); }
+  .c2 input[type=range] { background: linear-gradient(90deg, var(--vib2) var(--pct, 50%), var(--border) var(--pct, 50%)); }
+  .c3 input[type=range] { background: linear-gradient(90deg, var(--vib3) var(--pct, 50%), var(--border) var(--pct, 50%)); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid var(--bg); box-shadow: 0 0 10px currentColor; }
+  .c1 input[type=range]::-webkit-slider-thumb { background: var(--vib1); color: var(--vib1); }
+  .c2 input[type=range]::-webkit-slider-thumb { background: var(--vib2); color: var(--vib2); }
+  .c3 input[type=range]::-webkit-slider-thumb { background: var(--vib3); color: var(--vib3); }
+  .slider-ticks { display: flex; justify-content: space-between; font-size: 0.5rem; color: var(--dim); margin-top: 4px; padding: 0 2px; }
+
+  .num-input-wrap { display: flex; align-items: center; gap: 6px; margin-top: 0.7rem; }
+  .num-input {
+    background: #050a0e; border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text); font-family: 'Orbitron', sans-serif; font-size: 0.9rem;
+    width: 90px; padding: 5px 8px; text-align: right; outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s; -moz-appearance: textfield;
+  }
+  .num-input::-webkit-inner-spin-button, .num-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .c1 .num-input:focus { border-color: var(--vib1); box-shadow: 0 0 8px var(--glow1); }
+  .c2 .num-input:focus { border-color: var(--vib2); box-shadow: 0 0 8px var(--glow2); }
+  .c3 .num-input:focus { border-color: var(--vib3); box-shadow: 0 0 8px var(--glow3); }
+  .num-input-unit { font-size: 0.65rem; color: var(--dim); letter-spacing: 0.1em; }
+  .num-input-hint { font-size: 0.55rem; color: var(--dim); margin-left: auto; }
+
+  /* Preview bar (amplitude visual) */
+  .amp-preview { width: 100%; height: 30px; display: block; border-radius: 2px; margin-top: 0.6rem; opacity: 0.7; }
+
+  /* Main fire button */
+  .fire-panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1.2rem; margin-bottom: 1rem;
+  }
+  .fire-btn {
+    width: 100%; padding: 1rem 0; border-radius: 6px; border: 1.5px solid var(--vib1);
+    background: rgba(249,115,22,0.08); color: var(--vib1);
+    font-family: 'Orbitron', sans-serif; font-size: 0.85rem; font-weight: 700;
+    letter-spacing: 0.2em; cursor: pointer; transition: all 0.15s;
+    box-shadow: 0 0 14px var(--glow1); display: flex; align-items: center; justify-content: center; gap: 10px;
+  }
+  .fire-btn:hover { background: rgba(249,115,22,0.18); box-shadow: 0 0 28px var(--glow1); }
+  .fire-btn:active { transform: scale(0.97); }
+  .fire-btn.firing { background: rgba(249,115,22,0.3); animation: fire-pulse 0.15s ease-in-out; }
+  @keyframes fire-pulse { 0%{box-shadow:0 0 14px var(--glow1)} 50%{box-shadow:0 0 40px rgba(249,115,22,0.6)} 100%{box-shadow:0 0 14px var(--glow1)} }
+
+  .fire-icon { font-size: 1.1rem; }
+
+  .fire-meta { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-top: 0.8rem; }
+  .fmeta { background: #050a0e; border: 1px solid var(--border); border-radius: 5px; padding: 0.45rem 0.6rem; text-align: center; }
+  .fmeta-lbl { font-size: 0.48rem; color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 2px; }
+  .fmeta-val { font-family: 'Orbitron', sans-serif; font-size: 0.78rem; }
+  #fmFreq { color: var(--vib1); } #fmAmp { color: var(--vib2); } #fmDur { color: var(--vib3); }
+
+  /* Toggle button */
+  .toggle-btn {
+    display: flex; align-items: center; gap: 8px; background: transparent;
+    border: 1px solid var(--border); border-radius: 4px; padding: 6px 14px;
+    font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; letter-spacing: 0.1em;
+    cursor: pointer; transition: all 0.2s; color: var(--dim);
+  }
+  .toggle-btn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); transition: all 0.2s; flex-shrink: 0; }
+
+  /* Sequence builder */
+  .seq-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; padding: 0.5rem 0.7rem; background: #050a0e; border: 1px solid var(--border); border-radius: 6px; }
+  .seq-idx { font-size: 0.55rem; color: var(--dim); width: 16px; text-align: center; flex-shrink: 0; }
+  .seq-input { background: transparent; border: none; border-bottom: 1px solid var(--border); color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; width: 55px; text-align: center; outline: none; padding: 2px 0; -moz-appearance: textfield; }
+  .seq-input::-webkit-inner-spin-button, .seq-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .seq-input:focus { border-bottom-color: var(--vib3); }
+  .seq-sep { font-size: 0.55rem; color: var(--dim); }
+  .seq-del { background: transparent; border: none; color: var(--dim); cursor: pointer; font-size: 0.8rem; padding: 0 4px; margin-left: auto; transition: color 0.2s; }
+  .seq-del:hover { color: var(--danger); }
+
+  .seq-controls { display: flex; gap: 0.5rem; margin-top: 0.7rem; flex-wrap: wrap; }
+  .seq-btn {
+    flex: 1; min-width: 80px; display: flex; align-items: center; justify-content: center; gap: 6px;
+    background: transparent; border: 1px solid var(--border); border-radius: 5px;
+    padding: 7px 10px; font-family: 'Share Tech Mono', monospace; font-size: 0.65rem;
+    letter-spacing: 0.08em; cursor: pointer; transition: all 0.2s; color: var(--dim);
+  }
+  .seq-btn.add-btn:hover { border-color: var(--vib3); color: var(--vib3); box-shadow: 0 0 8px var(--glow3); }
+  .seq-btn.run-btn { border-color: rgba(249,115,22,0.4); color: var(--vib1); }
+  .seq-btn.run-btn:hover { border-color: var(--vib1); box-shadow: 0 0 10px var(--glow1); }
+  .seq-btn.stop-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* Status log */
+  .status-log {
+    background: #050a0e; border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.6rem 0.8rem; height: 90px; overflow-y: auto; font-size: 0.6rem;
+    line-height: 1.6; color: var(--dim); margin-bottom: 1rem;
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  }
+  .log-entry { display: flex; gap: 8px; }
+  .log-time { color: var(--vib2); flex-shrink: 0; }
+  .log-msg.ok { color: #22c55e; }
+  .log-msg.warn { color: #facc15; }
+  .log-msg.err { color: var(--danger); }
+  .log-msg.info { color: var(--text); }
+
+  /* Pattern presets */
+  .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem; }
+  .preset-btn {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.75rem 0.8rem; cursor: pointer; transition: all 0.2s;
+    font-family: 'Share Tech Mono', monospace; font-size: 0.62rem; color: var(--text);
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .preset-btn:hover { border-color: var(--vib1); color: var(--vib1); box-shadow: 0 0 10px var(--glow1); }
+  .preset-name { font-family: 'Orbitron', sans-serif; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; }
+  .preset-desc { font-size: 0.55rem; color: var(--dim); }
+
+  /* Continuous toggle */
+  .cont-panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1rem 1.2rem; margin-bottom: 1rem;
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  }
+  .cont-info { font-size: 0.6rem; }
+  .cont-label { font-family: 'Orbitron', sans-serif; font-size: 0.7rem; color: var(--vib3); letter-spacing: 0.15em; margin-bottom: 3px; }
+  .cont-sub { color: var(--dim); }
+  .cont-btn {
+    display: flex; align-items: center; gap: 8px; background: transparent;
+    border: 1px solid rgba(167,139,250,0.35); border-radius: 4px; padding: 8px 16px;
+    font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; letter-spacing: 0.1em;
+    cursor: pointer; transition: all 0.2s; color: var(--dim); flex-shrink: 0;
+  }
+  .cont-btn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); transition: all 0.2s; }
+  .cont-btn.active { color: var(--vib3); border-color: var(--vib3); box-shadow: 0 0 12px var(--glow3); }
+  .cont-btn.active .dot { background: var(--vib3); box-shadow: 0 0 8px var(--vib3); animation: cblink 1s infinite; }
+  @keyframes cblink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  /* Waveform visualizer */
+  #vibCanvas { width: 100%; height: 120px; display: block; border-radius: 4px; background: #030608; border: 1px solid var(--border); margin-top: 0.7rem; }
+
+  .footer { text-align: center; font-size: 0.55rem; color: var(--dim); letter-spacing: 0.15em; padding: 0.5rem 0 1.5rem; opacity: 0.5; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>SmartPhysics: Haptic Lab</h1>
+  <p class="subtitle">Vibration Motor Controller · Frequency · Amplitude · Duration</p>
+
+  <!-- Support banner -->
+  <div class="support-banner" id="supportBanner">
+    <div class="support-dot unknown" id="supportDot"></div>
+    <div class="support-text" id="supportText">Checking Vibration API support…</div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn active-tab" id="tabPulse" onclick="switchTab('pulse')">⚡ PULSE</button>
+    <button class="tab-btn" id="tabSeq" onclick="switchTab('seq')">🔗 SEQUENCE</button>
+    <button class="tab-btn" id="tabPreset" onclick="switchTab('preset')">📦 PRESETS</button>
+  </div>
+
+  <!-- STATUS LOG -->
+  <div class="status-log" id="statusLog"></div>
+
+  <!-- ── PULSE TAB ── -->
+  <div class="tab-pane visible" id="panePulse">
+
+    <!-- Frequency (pulse rate) -->
+    <div class="card c1">
+      <div class="card-header">
+        <div>
+          <div class="card-label">PULSE RATE</div>
+          <div class="val-display"><span id="freqVal">4</span><span class="val-unit">Hz</span></div>
+        </div>
+      </div>
+      <div class="slider-wrap">
+        <input type="range" id="freqSlider" min="1" max="50" value="4" step="1" oninput="updateFreq(this.value)">
+      </div>
+      <div class="slider-ticks"><span>1</span><span>10</span><span>20</span><span>30</span><span>40</span><span>50</span></div>
+      <div class="num-input-wrap">
+        <input class="num-input" id="freqInput" type="number" min="1" max="50" value="4" oninput="setFreqInput(this.value)">
+        <span class="num-input-unit">Hz</span>
+        <span class="num-input-hint">1 – 50 Hz</span>
+      </div>
+      <canvas class="amp-preview" id="freqCanvas"></canvas>
+    </div>
+
+    <!-- Amplitude -->
+    <div class="card c2">
+      <div class="card-header">
+        <div>
+          <div class="card-label">AMPLITUDE</div>
+          <div class="val-display"><span id="ampVal">80</span><span class="val-unit">%</span></div>
+        </div>
+      </div>
+      <div class="slider-wrap">
+        <input type="range" id="ampSlider" min="1" max="100" value="80" step="1" oninput="updateAmp(this.value)">
+      </div>
+      <div class="slider-ticks"><span>1%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+      <div class="num-input-wrap">
+        <input class="num-input" id="ampInput" type="number" min="1" max="100" value="80" oninput="setAmpInput(this.value)">
+        <span class="num-input-unit">%</span>
+        <span class="num-input-hint">1 – 100 %</span>
+      </div>
+      <canvas class="amp-preview" id="ampCanvas"></canvas>
+    </div>
+
+    <!-- Duration -->
+    <div class="card c3">
+      <div class="card-header">
+        <div>
+          <div class="card-label">DURATION</div>
+          <div class="val-display"><span id="durVal">500</span><span class="val-unit">ms</span></div>
+        </div>
+      </div>
+      <div class="slider-wrap">
+        <input type="range" id="durSlider" min="50" max="5000" value="500" step="50" oninput="updateDur(this.value)">
+      </div>
+      <div class="slider-ticks"><span>50</span><span>1s</span><span>2s</span><span>3s</span><span>4s</span><span>5s</span></div>
+      <div class="num-input-wrap">
+        <input class="num-input" id="durInput" type="number" min="50" max="5000" value="500" step="50" oninput="setDurInput(this.value)">
+        <span class="num-input-unit">ms</span>
+        <span class="num-input-hint">50 – 5000 ms</span>
+      </div>
+      <canvas class="amp-preview" id="durCanvas"></canvas>
+    </div>
+
+    <!-- Fire button -->
+    <div class="fire-panel">
+      <button class="fire-btn" id="fireBtn" onclick="firePulse()">
+        <span class="fire-icon">📳</span>
+        <span id="fireLbl">FIRE PULSE</span>
+      </button>
+      <div class="fire-meta">
+        <div class="fmeta"><div class="fmeta-lbl">Rate</div><div class="fmeta-val" id="fmFreq">4 Hz</div></div>
+        <div class="fmeta"><div class="fmeta-lbl">Amplitude</div><div class="fmeta-val" id="fmAmp">80 %</div></div>
+        <div class="fmeta"><div class="fmeta-lbl">Duration</div><div class="fmeta-val" id="fmDur">500 ms</div></div>
+      </div>
+    </div>
+
+    <!-- Continuous -->
+    <div class="cont-panel">
+      <div class="cont-info">
+        <div class="cont-label">CONTINUOUS</div>
+        <div class="cont-sub">Repeating pulse until stopped</div>
+      </div>
+      <button class="cont-btn" id="contBtn" onclick="toggleContinuous()">
+        <span class="dot"></span><span id="contLbl">OFF</span>
+      </button>
+    </div>
+
+    <!-- Waveform preview -->
+    <canvas id="vibCanvas"></canvas>
+
+  </div><!-- end panePulse -->
+
+  <!-- ── SEQUENCE TAB ── -->
+  <div class="tab-pane" id="paneSeq">
+    <div class="card c3" style="padding-bottom:0.8rem;">
+      <div class="card-header" style="margin-bottom:0.6rem;">
+        <div class="card-label">CUSTOM SEQUENCE</div>
+        <span style="font-size:0.55rem;color:var(--dim)">on/off ms pairs</span>
+      </div>
+      <div id="seqList"></div>
+      <div class="seq-controls">
+        <button class="seq-btn add-btn" onclick="addSeqStep()">＋ ADD STEP</button>
+        <button class="seq-btn run-btn" onclick="runSequence()">▶ RUN</button>
+        <button class="seq-btn stop-btn" onclick="stopVibration()">■ STOP</button>
+      </div>
+    </div>
+    <div style="font-size:0.6rem;color:var(--dim);line-height:1.7;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:0.9rem 1rem;margin-bottom:1rem;">
+      Each step is a pair of <span style="color:var(--vib2)">ON duration</span> and <span style="color:var(--dim)">OFF pause</span> in milliseconds.<br>
+      The pattern repeats once. Use PRESETS tab for quick patterns.
+    </div>
+  </div><!-- end paneSeq -->
+
+  <!-- ── PRESETS TAB ── -->
+  <div class="tab-pane" id="panePreset">
+    <div class="preset-grid" id="presetGrid"></div>
+    <div style="font-size:0.6rem;color:var(--dim);line-height:1.7;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:0.9rem 1rem;margin-bottom:1rem;">
+      Tap a preset to instantly fire that haptic pattern. Each preset uses the <span style="color:var(--vib1)">Vibration API</span> pattern array directly.
+    </div>
+  </div>
+
+  <div class="footer">HAPTIC LAB v1.0 · WEB VIBRATION API</div>
+</div>
+
+<script>
+// ── State ───────────────────────────────────────────────────────────
+let freq = 4, amp = 80, dur = 500;
+let contActive = false, contTimer = null, seqSteps = [];
+let vibAnimId = null, vibPhase = 0, vibActive = false;
+
+// ── Support check ───────────────────────────────────────────────────
+function checkSupport() {
+  const dot = document.getElementById('supportDot');
+  const txt = document.getElementById('supportText');
+  if ('vibrate' in navigator) {
+    dot.className = 'support-dot ok';
+    txt.textContent = 'Vibration API supported — ready to rumble';
+    txt.style.color = '#22c55e';
+    log('Vibration API detected', 'ok');
+  } else {
+    dot.className = 'support-dot no';
+    txt.textContent = 'Vibration API not supported on this device/browser';
+    txt.style.color = 'var(--danger)';
+    log('Vibration API not supported — simulation mode', 'warn');
+  }
+}
+
+// ── Logging ─────────────────────────────────────────────────────────
+function log(msg, type = 'info') {
+  const log = document.getElementById('statusLog');
+  const now = new Date();
+  const ts = now.getHours().toString().padStart(2,'0') + ':' +
+             now.getMinutes().toString().padStart(2,'0') + ':' +
+             now.getSeconds().toString().padStart(2,'0') + '.' +
+             now.getMilliseconds().toString().padStart(3,'0');
+  const el = document.createElement('div');
+  el.className = 'log-entry';
+  el.innerHTML = `<span class="log-time">[${ts}]</span><span class="log-msg ${type}">${msg}</span>`;
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+  // Keep max 50 entries
+  while (log.children.length > 50) log.removeChild(log.firstChild);
+}
+
+// ── Tabs ────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  ['pulse','seq','preset'].forEach(t => {
+    document.getElementById('pane' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('visible', t === tab);
+    document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active-tab', t === tab);
+  });
+}
+
+// ── Parameter controls ──────────────────────────────────────────────
+function setSliderPct(sliderId, val, min, max) {
+  const pct = ((val - min) / (max - min) * 100).toFixed(1);
+  document.getElementById(sliderId).style.setProperty('--pct', pct + '%');
+}
+
+function updateFreq(v) {
+  freq = parseInt(v);
+  document.getElementById('freqVal').textContent = freq;
+  document.getElementById('freqInput').value = freq;
+  document.getElementById('fmFreq').textContent = freq + ' Hz';
+  setSliderPct('freqSlider', freq, 1, 50);
+  drawFreqCanvas();
+  updateContIfActive();
+}
+function setFreqInput(v) {
+  let val = Math.max(1, Math.min(50, parseInt(v) || 1));
+  document.getElementById('freqSlider').value = val;
+  updateFreq(val);
+}
+
+function updateAmp(v) {
+  amp = parseInt(v);
+  document.getElementById('ampVal').textContent = amp;
+  document.getElementById('ampInput').value = amp;
+  document.getElementById('fmAmp').textContent = amp + ' %';
+  setSliderPct('ampSlider', amp, 1, 100);
+  drawAmpCanvas();
+  updateContIfActive();
+}
+function setAmpInput(v) {
+  let val = Math.max(1, Math.min(100, parseInt(v) || 1));
+  document.getElementById('ampSlider').value = val;
+  updateAmp(val);
+}
+
+function updateDur(v) {
+  dur = parseInt(v);
+  document.getElementById('durVal').textContent = dur;
+  document.getElementById('durInput').value = dur;
+  document.getElementById('fmDur').textContent = dur >= 1000 ? (dur/1000).toFixed(1)+'s' : dur+'ms';
+  setSliderPct('durSlider', dur, 50, 5000);
+  drawDurCanvas();
+  updateContIfActive();
+}
+function setDurInput(v) {
+  let val = Math.max(50, Math.min(5000, parseInt(v) || 50));
+  document.getElementById('durSlider').value = val;
+  updateDur(val);
+}
+
+// ── Canvas previews ─────────────────────────────────────────────────
+function drawFreqCanvas() {
+  const c = document.getElementById('freqCanvas');
+  const ctx = c.getContext('2d');
+  const W = c.offsetWidth || 440; c.width = W; c.height = 30;
+  ctx.clearRect(0, 0, W, 30);
+  ctx.strokeStyle = '#f97316'; ctx.lineWidth = 1.5;
+  const cycles = Math.max(0.5, freq / 2);
+  ctx.beginPath();
+  for (let x = 0; x < W; x++) {
+    const t = (x / W) * cycles * Math.PI * 2;
+    const y = 15 + Math.sin(t) * 11;
+    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+function drawAmpCanvas() {
+  const c = document.getElementById('ampCanvas');
+  const ctx = c.getContext('2d');
+  const W = c.offsetWidth || 440; c.width = W; c.height = 30;
+  ctx.clearRect(0, 0, W, 30);
+  const a = amp / 100;
+  const grad = ctx.createLinearGradient(0, 0, W, 0);
+  grad.addColorStop(0, 'rgba(56,189,248,0.2)');
+  grad.addColorStop(a, 'rgba(56,189,248,0.9)');
+  grad.addColorStop(a, 'rgba(56,189,248,0.1)');
+  grad.addColorStop(1, 'rgba(56,189,248,0.1)');
+  ctx.fillStyle = grad;
+  const barH = Math.max(4, a * 22);
+  ctx.fillRect(0, (30 - barH) / 2, W, barH);
+  ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 1;
+  ctx.strokeRect(0, (30 - barH) / 2, W, barH);
+}
+
+function drawDurCanvas() {
+  const c = document.getElementById('durCanvas');
+  const ctx = c.getContext('2d');
+  const W = c.offsetWidth || 440; c.width = W; c.height = 30;
+  ctx.clearRect(0, 0, W, 30);
+  const ratio = dur / 5000;
+  const fillW = Math.max(8, ratio * W);
+  ctx.fillStyle = 'rgba(167,139,250,0.15)'; ctx.fillRect(0, 0, W, 30);
+  const grad = ctx.createLinearGradient(0, 0, fillW, 0);
+  grad.addColorStop(0, 'rgba(167,139,250,0.7)');
+  grad.addColorStop(1, 'rgba(167,139,250,0.3)');
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, fillW, 30);
+  ctx.fillStyle = '#a78bfa'; ctx.fillRect(fillW - 2, 0, 2, 30);
+}
+
+// ── Vibration waveform animation ────────────────────────────────────
+function startVibAnim(durationMs) {
+  vibActive = true;
+  const canvas = document.getElementById('vibCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth || 460; canvas.width = W; canvas.height = 120;
+  const startTime = performance.now();
+
+  function draw(now) {
+    if (!vibActive) { drawIdleVib(ctx, W, 120); return; }
+    const elapsed = now - startTime;
+    if (elapsed > durationMs) { vibActive = false; drawIdleVib(ctx, W, 120); return; }
+    vibAnimId = requestAnimationFrame(draw);
+    const H = 120;
+    ctx.fillStyle = '#030608'; ctx.fillRect(0, 0, W, H);
+    // Grid
+    ctx.strokeStyle = 'rgba(26,47,74,0.4)'; ctx.lineWidth = 1;
+    for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(0, H * i / 4); ctx.lineTo(W, H * i / 4); ctx.stroke(); }
+    // Waveform
+    const a = amp / 100;
+    const phase = (elapsed / 1000) * freq * Math.PI * 2;
+    ctx.strokeStyle = `rgba(249,115,22,0.9)`; ctx.lineWidth = 2;
+    ctx.shadowBlur = 10; ctx.shadowColor = '#f97316';
+    ctx.beginPath();
+    for (let x = 0; x < W; x++) {
+      const t = phase + (x / W) * Math.PI * 8;
+      const y = H / 2 - Math.sin(t) * a * (H / 2 - 8);
+      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    // Progress bar
+    const prog = elapsed / durationMs;
+    ctx.fillStyle = 'rgba(249,115,22,0.2)'; ctx.fillRect(0, H - 4, W, 4);
+    ctx.fillStyle = '#f97316'; ctx.fillRect(0, H - 4, W * prog, 4);
+    // Labels
+    ctx.fillStyle = 'rgba(249,115,22,0.7)'; ctx.font = '9px Share Tech Mono';
+    ctx.fillText('FIRING — ' + Math.ceil(durationMs - elapsed) + 'ms remaining', 6, 14);
+  }
+  requestAnimationFrame(draw);
+}
+
+function drawIdleVib(ctx, W, H) {
+  if (!ctx) {
+    const canvas = document.getElementById('vibCanvas');
+    ctx = canvas.getContext('2d');
+    W = canvas.offsetWidth || 460; canvas.width = W; canvas.height = H = 120;
+  }
+  ctx.fillStyle = '#030608'; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(26,47,74,0.4)'; ctx.lineWidth = 1;
+  for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(0, H * i / 4); ctx.lineTo(W, H * i / 4); ctx.stroke(); }
+  ctx.strokeStyle = 'rgba(249,115,22,0.2)'; ctx.lineWidth = 1; ctx.setLineDash([4, 6]);
+  ctx.beginPath(); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(74,106,133,0.6)'; ctx.font = '9px Share Tech Mono';
+  ctx.fillText('STANDBY — press FIRE PULSE to activate', 8, 14);
+}
+
+// ── Vibration pattern builder ───────────────────────────────────────
+function buildPattern() {
+  // Creates a vibrate-pattern array simulating frequency and amplitude
+  // Using on/off pulse sequences to approximate the desired frequency
+  const period = Math.round(1000 / freq); // ms per cycle
+  const onTime = Math.round(period * (amp / 100));
+  const offTime = period - onTime;
+  const cycles = Math.floor(dur / period);
+  const pattern = [];
+  for (let i = 0; i < cycles; i++) {
+    pattern.push(Math.max(10, onTime));
+    if (i < cycles - 1) pattern.push(Math.max(1, offTime));
+  }
+  return pattern.length > 0 ? pattern : [dur];
+}
+
+// ── Fire pulse ──────────────────────────────────────────────────────
+function firePulse() {
+  const pattern = buildPattern();
+  const btn = document.getElementById('fireBtn');
+  btn.classList.add('firing');
+  setTimeout(() => btn.classList.remove('firing'), 300);
+
+  if ('vibrate' in navigator) {
+    navigator.vibrate(pattern);
+    log(`Fired: ${freq}Hz / ${amp}% / ${dur}ms → [${pattern.slice(0,6).join(',')}${pattern.length>6?'…':''}]`, 'ok');
+  } else {
+    log(`Simulated: ${freq}Hz / ${amp}% / ${dur}ms (no Vibration API)`, 'warn');
+  }
+  startVibAnim(dur);
+}
+
+// ── Continuous mode ─────────────────────────────────────────────────
+function toggleContinuous() {
+  contActive = !contActive;
+  document.getElementById('contBtn').classList.toggle('active', contActive);
+  document.getElementById('contLbl').textContent = contActive ? 'ON' : 'OFF';
+  if (contActive) { log('Continuous mode started', 'ok'); fireContinuous(); }
+  else { stopContinuous(); }
+}
+
+function fireContinuous() {
+  if (!contActive) return;
+  firePulse();
+  const gap = 100;
+  contTimer = setTimeout(fireContinuous, dur + gap);
+}
+
+function stopContinuous() {
+  contActive = false;
+  clearTimeout(contTimer);
+  if ('vibrate' in navigator) navigator.vibrate(0);
+  vibActive = false;
+  document.getElementById('contBtn').classList.remove('active');
+  document.getElementById('contLbl').textContent = 'OFF';
+  log('Continuous mode stopped', 'info');
+  drawIdleVib(null, 0, 120);
+}
+
+function updateContIfActive() {
+  if (contActive) {
+    clearTimeout(contTimer);
+    if ('vibrate' in navigator) navigator.vibrate(0);
+    fireContinuous();
+  }
+}
+
+// ── Sequence builder ────────────────────────────────────────────────
+function addSeqStep(on = 200, off = 100) {
+  seqSteps.push({ on, off });
+  renderSeqList();
+}
+
+function renderSeqList() {
+  const list = document.getElementById('seqList');
+  list.innerHTML = '';
+  seqSteps.forEach((step, i) => {
+    const row = document.createElement('div');
+    row.className = 'seq-row';
+    row.innerHTML = `
+      <span class="seq-idx">${i + 1}</span>
+      <span class="seq-sep" style="color:var(--vib1)">ON</span>
+      <input class="seq-input" type="number" min="10" max="5000" value="${step.on}" onchange="seqSteps[${i}].on=parseInt(this.value)||10" style="color:var(--vib2)">
+      <span class="seq-sep">ms</span>
+      <span class="seq-sep" style="margin-left:4px">OFF</span>
+      <input class="seq-input" type="number" min="0" max="5000" value="${step.off}" onchange="seqSteps[${i}].off=parseInt(this.value)||0">
+      <span class="seq-sep">ms</span>
+      <button class="seq-del" onclick="removeSeqStep(${i})">✕</button>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function removeSeqStep(i) {
+  seqSteps.splice(i, 1);
+  renderSeqList();
+}
+
+function runSequence() {
+  if (seqSteps.length === 0) { log('No sequence steps defined', 'warn'); return; }
+  const pattern = [];
+  seqSteps.forEach(s => { pattern.push(s.on); pattern.push(s.off); });
+  if ('vibrate' in navigator) {
+    navigator.vibrate(pattern);
+    log(`Sequence: [${pattern.join(',')}]`, 'ok');
+  } else {
+    log(`Sim sequence: [${pattern.join(',')}]`, 'warn');
+  }
+  const totalDur = pattern.reduce((a, b) => a + b, 0);
+  startVibAnim(totalDur);
+}
+
+function stopVibration() {
+  if ('vibrate' in navigator) navigator.vibrate(0);
+  vibActive = false;
+  stopContinuous();
+  log('Vibration stopped', 'info');
+  drawIdleVib(null, 0, 120);
+}
+
+// ── Presets ─────────────────────────────────────────────────────────
+const PRESETS = [
+  { name: 'Single Tap',     desc: 'Short sharp click',     pattern: [50] },
+  { name: 'Double Tap',     desc: 'Two quick taps',         pattern: [50, 80, 50] },
+  { name: 'Triple Tap',     desc: 'Three rapid pulses',     pattern: [40,60,40,60,40] },
+  { name: 'Long Buzz',      desc: 'Sustained 1s vibration', pattern: [1000] },
+  { name: 'Heartbeat',      desc: 'Lub-dub rhythm',         pattern: [100,80,80,500,100,80,80,500] },
+  { name: 'SOS',            desc: '···−−−··· Morse',        pattern: [100,100,100,100,100,200,300,100,300,100,300,200,100,100,100,100,100] },
+  { name: 'Ramp Up',        desc: 'Escalating intensity',   pattern: [20,80,40,70,80,60,160,50,320,40] },
+  { name: 'Notification',   desc: 'Message alert feel',     pattern: [100,50,100,50,200] },
+  { name: 'Error',          desc: 'Hard rejection buzz',    pattern: [200,60,200,60,200] },
+  { name: 'Success',        desc: 'Gentle confirm',         pattern: [30,50,30,50,80] },
+  { name: 'Rapid Fire',     desc: '20Hz burst for 1s',      pattern: Array.from({length:20}, (_,i) => i%2===0?30:20).flat() },
+  { name: 'Earthquake',     desc: 'Long chaotic rumble',    pattern: [300,50,200,30,400,20,150,80,350,40,250] },
+];
+
+function buildPresetGrid() {
+  const grid = document.getElementById('presetGrid');
+  PRESETS.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn';
+    btn.innerHTML = `<div class="preset-name">${p.name}</div><div class="preset-desc">${p.desc}</div>`;
+    btn.onclick = () => firePreset(p);
+    grid.appendChild(btn);
+  });
+}
+
+function firePreset(p) {
+  if ('vibrate' in navigator) {
+    navigator.vibrate(p.pattern);
+    log(`Preset "${p.name}": [${p.pattern.slice(0,8).join(',')}${p.pattern.length>8?'…':''}]`, 'ok');
+  } else {
+    log(`Sim preset "${p.name}" (no API)`, 'warn');
+  }
+  const total = p.pattern.reduce((a,b)=>a+b, 0);
+  startVibAnim(Math.min(total, 3000));
+}
+
+// ── Init ────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  checkSupport();
+  updateFreq(4); updateAmp(80); updateDur(500);
+  addSeqStep(200, 100); addSeqStep(400, 200); addSeqStep(100, 50);
+  buildPresetGrid();
+  drawIdleVib(null, 0, 120);
+});
+
+window.addEventListener('resize', () => {
+  drawFreqCanvas(); drawAmpCanvas(); drawDurCanvas();
+  if (!vibActive) drawIdleVib(null, 0, 120);
+});
+</script>
+</body>
+</html>

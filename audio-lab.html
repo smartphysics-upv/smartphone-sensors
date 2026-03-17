@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Audio Signal Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c10; --panel: #0d1520; --border: #1a2f4a;
+    --sig1: #00f5c4; --sig2: #ff5e5b; --mix: #a78bfa;
+    --text: #c8dff0; --dim: #4a6a85;
+    --glow1: rgba(0,245,196,0.25); --glow2: rgba(255,94,91,0.25);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh; padding: 1rem; overflow-x: hidden;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,245,196,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,245,196,0.03) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+  }
+  .container { position: relative; z-index: 1; max-width: 500px; margin: 0 auto; }
+  h1 {
+    font-family: 'Orbitron', sans-serif; font-weight: 900;
+    font-size: clamp(0.75rem, 3.5vw, 1.05rem); letter-spacing: 0.08em;
+    text-align: center; color: var(--sig1); text-shadow: 0 0 20px var(--glow1);
+    padding: 1rem 0 0.3rem; white-space: nowrap;
+  }
+  .subtitle {
+    text-align: center; font-size: 0.65rem; color: var(--dim);
+    letter-spacing: 0.25em; text-transform: uppercase; margin-bottom: 1.5rem;
+  }
+  .signal-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem; margin-bottom: 1rem;
+    position: relative; overflow: hidden;
+  }
+  .signal-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+  .signal-card.s1::before { background: linear-gradient(90deg, transparent, var(--sig1), transparent); }
+  .signal-card.s2::before { background: linear-gradient(90deg, transparent, var(--sig2), transparent); }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  .signal-label { font-family: 'Orbitron', sans-serif; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.2em; }
+  .s1 .signal-label { color: var(--sig1); }
+  .s2 .signal-label { color: var(--sig2); }
+  .freq-display { font-family: 'Orbitron', sans-serif; font-size: 1.4rem; font-weight: 700; letter-spacing: 0.05em; }
+  .s1 .freq-display { color: var(--sig1); text-shadow: 0 0 15px var(--glow1); }
+  .s2 .freq-display { color: var(--sig2); text-shadow: 0 0 15px var(--glow2); }
+  .freq-unit { font-size: 0.65rem; color: var(--dim); margin-left: 2px; }
+
+  .slider-wrap { position: relative; margin: 0.5rem 0; }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 2px; outline: none; cursor: pointer; }
+  .s1 input[type=range] { background: linear-gradient(90deg, var(--sig1) var(--pct1, 22%), var(--border) var(--pct1, 22%)); }
+  .s2 input[type=range] { background: linear-gradient(90deg, var(--sig2) var(--pct2, 50%), var(--border) var(--pct2, 50%)); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid var(--bg); box-shadow: 0 0 10px currentColor; }
+  .s1 input[type=range]::-webkit-slider-thumb { background: var(--sig1); color: var(--sig1); }
+  .s2 input[type=range]::-webkit-slider-thumb { background: var(--sig2); color: var(--sig2); }
+
+  .slider-ticks { display: flex; justify-content: space-between; font-size: 0.5rem; color: var(--dim); margin-top: 4px; padding: 0 2px; }
+
+  .toggle-btn {
+    display: flex; align-items: center; gap: 8px; background: transparent;
+    border: 1px solid var(--border); border-radius: 4px; padding: 6px 14px;
+    font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; letter-spacing: 0.1em;
+    cursor: pointer; transition: all 0.2s; color: var(--dim);
+  }
+  .toggle-btn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); transition: all 0.2s; flex-shrink: 0; }
+  .s1 .toggle-btn.active { color: var(--sig1); border-color: var(--sig1); box-shadow: 0 0 10px var(--glow1); }
+  .s1 .toggle-btn.active .dot { background: var(--sig1); box-shadow: 0 0 8px var(--sig1); }
+  .s2 .toggle-btn.active { color: var(--sig2); border-color: var(--sig2); box-shadow: 0 0 10px var(--glow2); }
+  .s2 .toggle-btn.active .dot { background: var(--sig2); box-shadow: 0 0 8px var(--sig2); }
+
+  .freq-input-wrap { display: flex; align-items: center; gap: 6px; margin-top: 0.7rem; }
+  .freq-input {
+    background: #050a0e; border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text); font-family: 'Orbitron', sans-serif; font-size: 0.9rem;
+    width: 88px; padding: 5px 8px; text-align: right; outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s; -moz-appearance: textfield;
+  }
+  .freq-input::-webkit-inner-spin-button, .freq-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .s1 .freq-input:focus { border-color: var(--sig1); box-shadow: 0 0 8px var(--glow1); }
+  .s2 .freq-input:focus { border-color: var(--sig2); box-shadow: 0 0 8px var(--glow2); }
+  .freq-input-unit { font-size: 0.65rem; color: var(--dim); letter-spacing: 0.1em; }
+  .freq-input-hint { font-size: 0.55rem; color: var(--dim); margin-left: auto; }
+  canvas.wave-preview { width: 100%; height: 30px; display: block; border-radius: 2px; margin-top: 0.6rem; opacity: 0.65; }
+
+  .mix-panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1rem 1.2rem; margin-bottom: 1rem;
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  }
+  .mix-label { font-family: 'Orbitron', sans-serif; font-size: 0.7rem; color: var(--mix); letter-spacing: 0.15em; }
+  .mix-btn {
+    display: flex; align-items: center; gap: 8px; background: transparent;
+    border: 1px solid rgba(167,139,250,0.3); border-radius: 4px; padding: 8px 18px;
+    font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; letter-spacing: 0.1em;
+    cursor: pointer; transition: all 0.2s; color: var(--dim);
+  }
+  .mix-btn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); transition: all 0.2s; flex-shrink: 0; }
+  .mix-btn.active { color: var(--mix); border-color: var(--mix); box-shadow: 0 0 12px rgba(167,139,250,0.3); }
+  .mix-btn.active .dot { background: var(--mix); box-shadow: 0 0 8px var(--mix); }
+
+  /* ── Mic visualizer ── */
+  .mic-section { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.2rem; margin-bottom: 1rem; }
+  .mic-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; }
+  .mic-section-title { font-family: 'Orbitron', sans-serif; font-size: 0.65rem; letter-spacing: 0.2em; color: var(--dim); }
+  .mic-btn {
+    display: flex; align-items: center; gap: 8px; background: transparent;
+    border: 1px solid var(--border); border-radius: 5px; padding: 6px 14px;
+    font-family: 'Share Tech Mono', monospace; font-size: 0.7rem;
+    letter-spacing: 0.08em; cursor: pointer; transition: all 0.2s; color: var(--dim); white-space: nowrap;
+  }
+  .mic-btn .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); transition: all 0.2s; flex-shrink: 0; }
+  .mic-btn.active { color: #facc15; border-color: #facc15; box-shadow: 0 0 12px rgba(250,204,21,0.25); }
+  .mic-btn.active .dot { background: #facc15; box-shadow: 0 0 8px #facc15; animation: mblink 1s infinite; }
+  @keyframes mblink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  canvas#waveCanvas { width: 100%; height: 180px; display: block; border-radius: 4px; background: #030608; border: 1px solid var(--border); }
+
+  .mic-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-top: 0.7rem; }
+  .mstat { background: #050a0e; border: 1px solid var(--border); border-radius: 5px; padding: 0.5rem 0.6rem; text-align: center; }
+  .mstat-lbl { font-size: 0.5rem; color: var(--dim); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 2px; }
+  .mstat-val { font-family: 'Orbitron', sans-serif; font-size: 0.8rem; color: var(--sig1); }
+
+  .ctrl-row { display: flex; align-items: center; gap: 1rem; margin-top: 0.7rem; }
+  .ctrl-lbl { font-size: 0.6rem; color: var(--dim); letter-spacing: 0.08em; white-space: nowrap; line-height: 1.4; }
+  .ctrl-lbl strong { font-family: 'Orbitron', sans-serif; display: block; }
+  .ctrl-lbl.tcolor strong { color: var(--sig1); }
+  .ctrl-lbl.gcolor strong { color: #facc15; }
+  input.ctrl-slider { -webkit-appearance: none; appearance: none; flex: 1; height: 4px; border-radius: 2px; outline: none; cursor: pointer; }
+  input.ctrl-slider.time-sl { background: linear-gradient(90deg, var(--sig1) var(--tpct, 31%), var(--border) var(--tpct, 31%)); }
+  input.ctrl-slider.gain-sl { background: linear-gradient(90deg, #facc15 var(--gpct, 0%), var(--border) var(--gpct, 0%)); }
+  input.ctrl-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid var(--bg); box-shadow: 0 0 8px currentColor; }
+  input.ctrl-slider.time-sl::-webkit-slider-thumb { background: var(--sig1); color: var(--sig1); }
+  input.ctrl-slider.gain-sl::-webkit-slider-thumb { background: #facc15; color: #facc15; }
+
+  /* Freeze button */
+  .freeze-btn {
+    width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: transparent; border: 1px solid var(--border); border-radius: 5px;
+    padding: 8px 0; font-family: 'Share Tech Mono', monospace; font-size: 0.7rem;
+    letter-spacing: 0.12em; cursor: pointer; transition: all 0.2s; color: var(--dim);
+  }
+  .freeze-btn:hover { border-color: var(--sig1); color: var(--sig1); box-shadow: 0 0 8px var(--glow1); }
+  .freeze-btn.frozen { color: #fb923c; border-color: #fb923c; box-shadow: 0 0 10px rgba(251,146,60,0.3); }
+
+  /* Snapshot row */
+  .snapshot-row { display: flex; gap: 0.6rem; margin-top: 0.8rem; }
+  .snap-btn {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+    background: transparent; border: 1px solid var(--border); border-radius: 5px;
+    padding: 7px 10px; font-family: 'Share Tech Mono', monospace; font-size: 0.65rem;
+    letter-spacing: 0.08em; cursor: pointer; transition: all 0.2s; color: var(--dim);
+  }
+  .snap-btn:hover { border-color: var(--sig1); color: var(--sig1); box-shadow: 0 0 8px var(--glow1); }
+  .snap-btn.csv-btn:hover { border-color: #a78bfa; color: #a78bfa; box-shadow: 0 0 8px rgba(167,139,250,0.3); }
+  .snap-btn.png-btn:hover { border-color: #facc15; color: #facc15; box-shadow: 0 0 8px rgba(250,204,21,0.25); }
+
+  /* ── Tab switcher ── */
+  .tab-bar {
+    display: flex; gap: 0; margin-bottom: 1.2rem;
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  }
+  .tab-btn {
+    flex: 1; padding: 0.65rem 0; background: transparent;
+    font-family: 'Orbitron', sans-serif; font-size: 0.65rem; font-weight: 700;
+    letter-spacing: 0.15em; cursor: pointer; transition: all 0.2s;
+    color: var(--dim); border: none; border-right: 1px solid var(--border);
+  }
+  .tab-btn:last-child { border-right: none; }
+  .tab-btn.active-tab { background: var(--panel); color: var(--sig1); box-shadow: inset 0 -2px 0 var(--sig1); }
+  .tab-btn:not(.active-tab):hover { color: var(--text); background: rgba(255,255,255,0.03); }
+
+  .tab-pane { display: none; }
+  .tab-pane.visible { display: block; }
+
+  .nav-link {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.9rem; margin-bottom: 1rem; color: #facc15;
+    font-size: 0.7rem; letter-spacing: 0.12em; text-decoration: none; transition: all 0.2s;
+  }
+  .nav-link:hover, .nav-link:active { border-color: #facc15; box-shadow: 0 0 10px rgba(250,204,21,0.2); }
+  .footer { text-align: center; font-size: 0.55rem; color: var(--dim); letter-spacing: 0.15em; padding: 0.5rem 0 1.5rem; opacity: 0.5; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>SmartPhysics: Acoustic Beat</h1>
+  <p class="subtitle" id="subtitle">Dual Sine Wave Generator · 0 – 2000 Hz</p>
+
+  <!-- Tab switcher -->
+  <div class="tab-bar">
+    <button class="tab-btn active-tab" id="tabBtnGen" onclick="switchTab('gen')">⚡ GENERATOR</button>
+    <button class="tab-btn" id="tabBtnMic" onclick="switchTab('mic')">🎙 WAVEFORM</button>
+  </div>
+
+  <!-- Generator pane -->
+  <div class="tab-pane visible" id="paneGen">
+
+  <!-- Signal A -->
+  <div class="signal-card s1">
+    <div class="card-header">
+      <div>
+        <div class="signal-label">SIGNAL — A</div>
+        <div class="freq-display"><span id="f1val">440</span><span class="freq-unit">Hz</span></div>
+      </div>
+      <button class="toggle-btn" id="btn1" onclick="toggleSignal(1)">
+        <span class="dot"></span><span id="lbl1">OFF</span>
+      </button>
+    </div>
+    <div class="slider-wrap">
+      <input type="range" id="slider1" min="0" max="2000" value="440" step="1" oninput="updateFreq(1, this.value)">
+    </div>
+    <div class="slider-ticks"><span>0</span><span>250</span><span>500</span><span>750</span><span>1k</span><span>1250</span><span>1500</span><span>1750</span><span>2k</span></div>
+    <div class="freq-input-wrap">
+      <input class="freq-input" id="input1" type="number" min="0" max="2000" value="440" oninput="setFreqFromInput(1)" onchange="setFreqFromInput(1)">
+      <span class="freq-input-unit">Hz</span>
+      <span class="freq-input-hint">0 – 2000 Hz</span>
+    </div>
+    <canvas class="wave-preview" id="wave1"></canvas>
+  </div>
+
+  <!-- Signal B -->
+  <div class="signal-card s2">
+    <div class="card-header">
+      <div>
+        <div class="signal-label">SIGNAL — B</div>
+        <div class="freq-display"><span id="f2val">1000</span><span class="freq-unit">Hz</span></div>
+      </div>
+      <button class="toggle-btn" id="btn2" onclick="toggleSignal(2)">
+        <span class="dot"></span><span id="lbl2">OFF</span>
+      </button>
+    </div>
+    <div class="slider-wrap">
+      <input type="range" id="slider2" min="0" max="2000" value="1000" step="1" oninput="updateFreq(2, this.value)">
+    </div>
+    <div class="slider-ticks"><span>0</span><span>250</span><span>500</span><span>750</span><span>1k</span><span>1250</span><span>1500</span><span>1750</span><span>2k</span></div>
+    <div class="freq-input-wrap">
+      <input class="freq-input" id="input2" type="number" min="0" max="2000" value="1000" oninput="setFreqFromInput(2)" onchange="setFreqFromInput(2)">
+      <span class="freq-input-unit">Hz</span>
+      <span class="freq-input-hint">0 – 2000 Hz</span>
+    </div>
+    <canvas class="wave-preview" id="wave2"></canvas>
+  </div>
+
+  <!-- Mix -->
+  <div class="mix-panel">
+    <div>
+      <div class="mix-label">MIX A + B</div>
+      <div style="font-size:0.6rem;color:var(--dim);margin-top:3px;">Play both signals together</div>
+    </div>
+    <button class="mix-btn" id="btnMix" onclick="toggleMix()">
+      <span class="dot"></span><span id="lblMix">OFF</span>
+    </button>
+  </div>
+
+  </div><!-- end paneGen -->
+
+  <!-- Waveform pane -->
+  <div class="tab-pane" id="paneMic">
+  <div class="mic-section">
+    <div class="mic-section-header">
+      <div class="mic-section-title">🎙 MICROPHONE — WAVEFORM</div>
+      <button class="mic-btn" id="micBtn" onclick="toggleMic()">
+        <span class="dot"></span><span id="micLbl">ENABLE</span>
+      </button>
+    </div>
+    <canvas id="waveCanvas"></canvas>
+    <div class="mic-stats">
+      <div class="mstat"><div class="mstat-lbl">Peak</div><div class="mstat-val" id="mPeak">—</div></div>
+      <div class="mstat"><div class="mstat-lbl">RMS</div><div class="mstat-val" id="mRms">—</div></div>
+      <div class="mstat"><div class="mstat-lbl">DC Offset</div><div class="mstat-val" id="mDc">—</div></div>
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-lbl tcolor">TIME SCALE<br><strong id="timeLbl">20 ms</strong></div>
+      <input class="ctrl-slider time-sl" id="timeSlider" type="range" min="0" max="12" value="4" step="1" oninput="updateTimeScale(this.value)">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-lbl gcolor">V ZOOM<br><strong id="gainLbl">1.0×</strong></div>
+      <input class="ctrl-slider gain-sl" id="gainSlider" type="range" min="1" max="20" value="1" step="0.5" oninput="updateMicGain(this.value)">
+    </div>
+    <!-- Freeze -->
+    <div class="ctrl-row" style="margin-top:0.8rem;">
+      <button class="freeze-btn" id="freezeBtn" onclick="toggleFreeze()">
+        <span id="freezeIco">⏸</span> <span id="freezeLbl">FREEZE</span>
+      </button>
+    </div>
+    <!-- Snapshot buttons -->
+    <div class="snapshot-row">
+      <button class="snap-btn csv-btn" onclick="saveSnapshot('csv')" title="Save waveform data as CSV">💾 Save CSV</button>
+      <button class="snap-btn png-btn" onclick="saveSnapshot('png')" title="Save waveform image as PNG">🖼 Save PNG</button>
+    </div>
+  </div>
+
+  </div><!-- end paneMic -->
+
+  <div class="footer">AUDIO SIGNAL GENERATOR v2.0 · WEB AUDIO API</div>
+</div>
+
+<script>
+function switchTab(tab) {
+  const isGen = tab === 'gen';
+  document.getElementById('paneGen').classList.toggle('visible', isGen);
+  document.getElementById('paneMic').classList.toggle('visible', !isGen);
+  document.getElementById('tabBtnGen').classList.toggle('active-tab', isGen);
+  document.getElementById('tabBtnMic').classList.toggle('active-tab', !isGen);
+  document.getElementById('subtitle').textContent = isGen
+    ? 'Dual Sine Wave Generator · 0 – 2000 Hz'
+    : 'Wave Visualization';
+  if (!isGen) {
+    // re-init canvas size when tab becomes visible
+    setTimeout(() => { if (!micActive) clearWaveCanvas(); }, 50);
+  }
+}
+
+// ── Audio context & oscillators ─────────────────────────────────
+let audioCtx;
+function getCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+const osc = { 1: null, 2: null };
+const gainNode = { 1: null, 2: null };
+const active = { 1: false, 2: false, mix: false };
+let freq = { 1: 440, 2: 1000 };
+
+function createOsc(n) {
+  const ac = getCtx();
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = 'sine'; o.frequency.value = Math.max(1, freq[n]); g.gain.value = 0.4;
+  o.connect(g); g.connect(ac.destination); o.start();
+  osc[n] = o; gainNode[n] = g;
+}
+function destroyOsc(n) {
+  if (osc[n]) { try { osc[n].stop(); } catch(e){} osc[n] = null; gainNode[n] = null; }
+}
+function toggleSignal(n) {
+  if (active.mix) { active.mix = false; updateMixBtn(); [1,2].forEach(k => { if (active[k]) destroyOsc(k); active[k] = false; }); }
+  active[n] = !active[n];
+  if (active[n]) createOsc(n); else destroyOsc(n);
+  document.getElementById('btn' + n).classList.toggle('active', active[n]);
+  document.getElementById('lbl' + n).textContent = active[n] ? 'ON' : 'OFF';
+}
+function toggleMix() {
+  active.mix = !active.mix;
+  if (active.mix) {
+    [1,2].forEach(n => { if (active[n]) { destroyOsc(n); active[n] = false; } });
+    ['btn1','lbl1','btn2','lbl2'].forEach((id,i) => { const el = document.getElementById(id); if (i%2===0) el.classList.remove('active'); else el.textContent = 'OFF'; });
+    createOsc(1); active[1] = true; createOsc(2); active[2] = true;
+  } else { [1,2].forEach(n => { destroyOsc(n); active[n] = false; }); }
+  updateMixBtn();
+}
+function updateMixBtn() {
+  document.getElementById('btnMix').classList.toggle('active', active.mix);
+  document.getElementById('lblMix').textContent = active.mix ? 'ON' : 'OFF';
+}
+function setFreqFromInput(n) {
+  let val = parseInt(document.getElementById('input' + n).value);
+  if (isNaN(val)) return;
+  val = Math.max(0, Math.min(2000, val));
+  document.getElementById('slider' + n).value = val;
+  updateFreq(n, val);
+}
+function updateFreq(n, val) {
+  val = parseInt(val); freq[n] = val;
+  document.getElementById('f' + n + 'val').textContent = val;
+  document.getElementById('input' + n).value = val;
+  const pct = (val / 2000 * 100).toFixed(1);
+  document.getElementById('slider' + n).style.setProperty('--pct' + n, pct + '%');
+  if (osc[n]) osc[n].frequency.setTargetAtTime(Math.max(1, val), getCtx().currentTime, 0.01);
+  drawWave(n);
+}
+function drawWave(n) {
+  const canvas = document.getElementById('wave' + n);
+  const c = canvas.getContext('2d');
+  const W = canvas.offsetWidth || 300;
+  canvas.width = W; canvas.height = 30; c.clearRect(0, 0, W, 30);
+  const color = n === 1 ? '#00f5c4' : '#ff5e5b';
+  c.strokeStyle = color; c.lineWidth = 1.5; c.globalAlpha = 0.8;
+  if (freq[n] === 0) { c.globalAlpha = 0.4; c.beginPath(); c.moveTo(0,15); c.lineTo(W,15); c.stroke(); return; }
+  c.beginPath();
+  // Scale: at 2000 Hz show ~20 cycles; linear mapping so density always grows with freq
+  const cycles = Math.max(0.5, freq[n] / 100);
+  for (let x = 0; x < W; x++) { const t = (x/W)*cycles*Math.PI*2; const y = 15+Math.sin(t)*11; x===0?c.moveTo(x,y):c.lineTo(x,y); }
+  c.stroke();
+}
+
+// ── Microphone visualizer ────────────────────────────────────────
+let micStream = null, micAnalyser = null, micSource = null, micAnimId = null, micActive = false;
+let micGain = 1.0, timeScale = 20;
+let lastTimeData = null;
+let frozen = false;
+
+function toggleFreeze() {
+  if (!micActive) return;
+  frozen = !frozen;
+  const btn = document.getElementById('freezeBtn');
+  btn.classList.toggle('frozen', frozen);
+  document.getElementById('freezeIco').textContent = frozen ? '▶' : '⏸';
+  document.getElementById('freezeLbl').textContent = frozen ? 'RESUME' : 'FREEZE';
+}
+const timeSteps = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
+
+function updateTimeScale(idx) {
+  timeScale = timeSteps[parseInt(idx)];
+  const label = timeScale >= 1000 ? (timeScale/1000).toFixed(timeScale%1000===0?0:1)+'s' : timeScale+'ms';
+  document.getElementById('timeLbl').textContent = label;
+  const pct = (parseInt(idx) / (timeSteps.length - 1) * 100).toFixed(1);
+  document.getElementById('timeSlider').style.setProperty('--tpct', pct + '%');
+}
+function updateMicGain(val) {
+  micGain = parseFloat(val);
+  document.getElementById('gainLbl').textContent = micGain.toFixed(1) + '×';
+  const pct = ((val - 1) / 19 * 100).toFixed(1);
+  document.getElementById('gainSlider').style.setProperty('--gpct', pct + '%');
+}
+async function toggleMic() { if (micActive) stopMic(); else await startMic(); }
+async function startMic() {
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false });
+    const ac = getCtx();
+    micSource = ac.createMediaStreamSource(micStream);
+    micAnalyser = ac.createAnalyser();
+    micAnalyser.fftSize = 16384; micAnalyser.smoothingTimeConstant = 0.0;
+    micSource.connect(micAnalyser);
+    micActive = true;
+    document.getElementById('micBtn').classList.add('active');
+    document.getElementById('micLbl').textContent = 'ON';
+    drawMicLoop();
+  } catch(e) { alert('Microphone access denied.\n' + e.message); }
+}
+function stopMic() {
+  if (micAnimId) cancelAnimationFrame(micAnimId);
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+  if (micSource) micSource.disconnect();
+  micStream = null; micAnalyser = null; micSource = null; micActive = false; micAnimId = null;
+  frozen = false;
+  document.getElementById('freezeBtn').classList.remove('frozen');
+  document.getElementById('freezeIco').textContent = '⏸';
+  document.getElementById('freezeLbl').textContent = 'FREEZE';
+  document.getElementById('micBtn').classList.remove('active');
+  document.getElementById('micLbl').textContent = 'ENABLE';
+  clearWaveCanvas();
+  ['mPeak','mRms','mDc'].forEach(id => document.getElementById(id).textContent = '—');
+}
+function clearWaveCanvas() {
+  const canvas = document.getElementById('waveCanvas');
+  const c = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth || 460; canvas.height = 180;
+  const W = canvas.width, H = canvas.height;
+  c.fillStyle = '#030608'; c.fillRect(0, 0, W, H);
+  c.strokeStyle = 'rgba(26,47,74,0.4)'; c.lineWidth = 1; c.setLineDash([]);
+  [0.25, 0.5, 0.75].forEach(f => { c.beginPath(); c.moveTo(0,H*f); c.lineTo(W,H*f); c.stroke(); });
+  c.strokeStyle = 'rgba(0,245,196,0.1)'; c.setLineDash([4,6]);
+  c.beginPath(); c.moveTo(0,H/2); c.lineTo(W,H/2); c.stroke(); c.setLineDash([]);
+}
+
+function renderWave(c, W, H, timeData) {
+  const ac = getCtx();
+  const bufLen = timeData.length;
+  const samplesToShow = Math.min(bufLen, Math.round(ac.sampleRate * timeScale / 1000));
+  const spp = samplesToShow / W;
+  c.fillStyle = '#030608'; c.fillRect(0, 0, W, H);
+  // Grid
+  c.strokeStyle = 'rgba(26,47,74,0.45)'; c.lineWidth = 1; c.setLineDash([]);
+  const divs = 5;
+  for (let i = 1; i < divs; i++) { const x=(i/divs)*W; c.beginPath(); c.moveTo(x,0); c.lineTo(x,H); c.stroke(); }
+  [0.1, 0.25, 0.5, 0.75, 0.9].forEach(f => { c.beginPath(); c.moveTo(0,H*f); c.lineTo(W,H*f); c.stroke(); });
+  // Time labels
+  c.fillStyle = 'rgba(0,245,196,0.45)'; c.font = '9px Share Tech Mono';
+  for (let i = 0; i <= divs; i++) {
+    const x=(i/divs)*W, tMs=(i/divs)*timeScale;
+    const lbl = tMs>=1000 ? (tMs/1000).toFixed(tMs%1000===0?0:2)+'s' : tMs.toFixed(tMs<1?2:0)+'ms';
+    c.fillText(lbl, x+2, H-4);
+  }
+  // Centre line
+  c.strokeStyle = 'rgba(250,204,21,0.12)'; c.lineWidth = 1; c.setLineDash([4,6]);
+  c.beginPath(); c.moveTo(0,H/2); c.lineTo(W,H/2); c.stroke(); c.setLineDash([]);
+  // Amplitude labels
+  c.fillStyle = 'rgba(74,106,133,0.8)'; c.font = '9px Share Tech Mono';
+  c.fillText('+'+(1/micGain).toFixed(2), 3, 11);
+  c.fillText('  0.00', 3, H/2-3);
+  c.fillText('-'+(1/micGain).toFixed(2), 3, H-14);
+  // Trigger
+  const searchLen = Math.min(bufLen/2, samplesToShow);
+  let trigIdx = 0;
+  for (let i = 1; i < searchLen; i++) { if (timeData[i-1]<=0 && timeData[i]>0) { trigIdx=i; break; } }
+  const halfH=H/2, scale=halfH*micGain-4;
+  // Glow
+  c.strokeStyle = 'rgba(0,245,196,0.1)'; c.lineWidth = 6; c.beginPath();
+  for (let x=0; x<W; x++) { const si=trigIdx+Math.floor(x*spp); if(si>=bufLen) break; const y=halfH-timeData[si]*scale; x===0?c.moveTo(x,y):c.lineTo(x,y); }
+  c.stroke();
+  // Line
+  c.strokeStyle = 'rgba(0,245,196,0.95)'; c.lineWidth = 1.8; c.beginPath();
+  for (let x=0; x<W; x++) { const si=trigIdx+Math.floor(x*spp); if(si>=bufLen) break; const y=halfH-timeData[si]*scale; x===0?c.moveTo(x,y):c.lineTo(x,y); }
+  c.stroke();
+  return { samplesToShow, trigIdx, spp };
+}
+
+function drawMicLoop() {
+  const canvas = document.getElementById('waveCanvas');
+  canvas.width = canvas.offsetWidth || 460; canvas.height = 180;
+  const c = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const bufLen = micAnalyser.fftSize;
+  const timeData = new Float32Array(bufLen);
+
+  function draw() {
+    micAnimId = requestAnimationFrame(draw);
+    if (frozen) return; // screen frozen — keep last frame
+    micAnalyser.getFloatTimeDomainData(timeData);
+    lastTimeData = timeData.slice(); // keep latest frame for snapshots
+    renderWave(c, W, H, timeData);
+    // Stats
+    const ac = getCtx();
+    const samplesToShow = Math.min(bufLen, Math.round(ac.sampleRate * timeScale / 1000));
+    let peak=0, sum=0, sumSq=0;
+    const n = Math.min(bufLen, samplesToShow);
+    for (let i=0; i<n; i++) { const v=timeData[i]; if(Math.abs(v)>peak) peak=Math.abs(v); sum+=v; sumSq+=v*v; }
+    document.getElementById('mPeak').textContent = peak.toFixed(3);
+    document.getElementById('mRms').textContent = Math.sqrt(sumSq/n).toFixed(3);
+    document.getElementById('mDc').textContent = (sum/n).toFixed(4);
+  }
+  draw();
+}
+
+// ── Snapshot / Save ──────────────────────────────────────────────
+function saveSnapshot(format) {
+  if (!lastTimeData) { alert('No waveform data yet — enable the microphone first.'); return; }
+  const ac = getCtx();
+  const sampleRate = ac.sampleRate;
+  const samplesToShow = Math.min(lastTimeData.length, Math.round(sampleRate * timeScale / 1000));
+  const tsLabel = timeScale >= 1000 ? (timeScale/1000).toFixed(1)+'s' : timeScale+'ms';
+  const timestamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  const filename = `waveform_${tsLabel}_${timestamp}`;
+
+  if (format === 'csv') {
+    // Build CSV: index, time_s, amplitude
+    let csv = 'sample_index,time_s,amplitude\n';
+    for (let i = 0; i < samplesToShow; i++) {
+      const t = (i / sampleRate).toFixed(8);
+      csv += `${i},${t},${lastTimeData[i].toFixed(8)}\n`;
+    }
+    const blob = new Blob([csv], { type: 'text/csv' });
+    triggerDownload(URL.createObjectURL(blob), filename + '.csv');
+
+  } else if (format === 'png') {
+    // Render waveform onto an offscreen canvas and download
+    const W = 900, H = 300;
+    const off = document.createElement('canvas');
+    off.width = W; off.height = H;
+    const c = off.getContext('2d');
+    renderWave(c, W, H, lastTimeData);
+    // Watermark
+    c.fillStyle = 'rgba(74,106,133,0.6)'; c.font = '11px monospace';
+    c.fillText(`Signal A: ${freq[1]} Hz  |  Signal B: ${freq[2]} Hz  |  Time scale: ${tsLabel}  |  ${new Date().toLocaleString()}`, 8, H-8);
+    off.toBlob(blob => triggerDownload(URL.createObjectURL(blob), filename + '.png'), 'image/png');
+  }
+}
+
+function triggerDownload(url, filename) {
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+window.addEventListener('load', () => { updateFreq(1,440); updateFreq(2,1000); clearWaveCanvas(); updateTimeScale(4); });
+window.addEventListener('resize', () => { drawWave(1); drawWave(2); if (!micActive) clearWaveCanvas(); });
+</script>
+</body>
+</html>
