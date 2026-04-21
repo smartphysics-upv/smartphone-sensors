@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monte Carlo Planck Spectral Emissive Power</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        label {
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .value-display {
+            color: #667eea;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        
+        .temp-color-indicator {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-left: 10px;
+            vertical-align: middle;
+            border: 2px solid #333;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            margin-top: 5px;
+        }
+        
+        .button-group {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        button.save-btn {
+            background: #28a745;
+        }
+        
+        button.save-btn:hover {
+            background: #218838;
+        }
+        
+        button.save-btn:disabled {
+            background: #ccc;
+        }
+        
+        #plot {
+            width: 100%;
+            height: 500px;
+            margin: 20px 0;
+        }
+        
+        #convergence-plot {
+            width: 100%;
+            height: 250px;
+            margin: 20px 0;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            padding: 20px;
+            background: #e8f4f8;
+            border-radius: 10px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff3cd;
+            border-radius: 10px;
+            font-size: 14px;
+            color: #856404;
+        }
+        
+        .save-section {
+            margin-top: 20px;
+            padding: 20px;
+            background: #d4edda;
+            border-radius: 10px;
+            border: 2px solid #28a745;
+        }
+        
+        .save-section h3 {
+            margin-top: 0;
+            color: #155724;
+        }
+        
+        .save-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .save-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .save-option input[type="radio"] {
+            cursor: pointer;
+        }
+        
+        .save-option label {
+            margin: 0;
+            font-weight: normal;
+            cursor: pointer;
+        }
+        
+        button.convergence-btn {
+            background: #17a2b8;
+        }
+        
+        button.convergence-btn:hover {
+            background: #138496;
+        }
+        
+        button.convergence-btn:disabled {
+            background: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Monte Carlo Photon Generation - Planck's Law</h1>
+        <div class="subtitle">
+            Photons are generated one by one using Monte Carlo rejection sampling.<br>
+            The histogram converges to <strong>Planck's spectral emissive power</strong>.
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>Temperature T: <span class="value-display" id="temp-val">3000 K</span><span class="temp-color-indicator" id="temp-color"></span></label>
+                <input type="range" id="temp" min="500" max="6000" step="100" value="3000">
+            </div>
+            
+            <div class="control-group">
+                <label>λ min: <span class="value-display" id="lam-min-val">200 nm</span></label>
+                <input type="range" id="lam-min" min="100" max="800" step="10" value="200">
+            </div>
+            
+            <div class="control-group">
+                <label>λ max: <span class="value-display" id="lam-max-val">3000 nm</span></label>
+                <input type="range" id="lam-max" min="1000" max="5000" step="100" value="3000">
+            </div>
+            
+            <div class="control-group">
+                <label>Total photons: <span class="value-display" id="n-photons-val">5,000</span></label>
+                <input type="range" id="n-photons" min="1000" max="4000000" step="5000" value="5000">
+                <small style="color: #888; font-size: 11px;">Range: 1K to 4M</small>
+            </div>
+            
+            <div class="control-group">
+                <label>Number of bins: <span class="value-display" id="n-bins-val">60</span></label>
+                <input type="range" id="n-bins" min="20" max="120" step="5" value="60">
+            </div>
+            
+            <div class="control-group">
+                <label>Update every N photons: <span class="value-display" id="update-val">100</span></label>
+                <input type="range" id="update-every" min="10" max="500" step="10" value="100">
+            </div>
+        </div>
+        
+        <div class="button-group">
+            <button id="start-btn">▶ Start Simulation</button>
+            <button id="pause-btn" disabled>⏸ Pause</button>
+            <button id="reset-btn">🔄 Reset</button>
+            <button id="save-btn" class="save-btn" disabled>💾 Save Data to File</button>
+            <button id="save-convergence-btn" class="convergence-btn" disabled>📊 Save Convergence Data</button>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="accepted-count">0</div>
+                <div class="stat-label">Photons Accepted</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="total-trials">0</div>
+                <div class="stat-label">Total Trials</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="acceptance-rate">0%</div>
+                <div class="stat-label">Acceptance Rate</div>
+            </div>
+        </div>
+        
+        <div id="plot"></div>
+        
+        <div id="convergence-plot"></div>
+        
+        <div class="save-section">
+            <h3>💾 Data Export Options</h3>
+            <p>Choose the format for saving the generated random wavelength values:</p>
+            <div class="save-options">
+                <div class="save-option">
+                    <input type="radio" id="format-simple" name="save-format" value="simple" checked>
+                    <label for="format-simple">Simple list (one wavelength per line in nm)</label>
+                </div>
+                <div class="save-option">
+                    <input type="radio" id="format-csv" name="save-format" value="csv">
+                    <label for="format-csv">CSV format with headers (wavelength_nm, photon_index)</label>
+                </div>
+                <div class="save-option">
+                    <input type="radio" id="format-detailed" name="save-format" value="detailed">
+                    <label for="format-detailed">Detailed format with simulation parameters and metadata</label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="info">
+            <strong>About this simulation:</strong> This uses Monte Carlo rejection sampling to generate photons 
+            according to Planck's spectral emissive power law: 
+            E<sub>λ</sub>(λ,T) = (2πhc²/λ⁵) × 1/(e<sup>hc/λk<sub>B</sub>T</sup> - 1).
+            The theoretical Planck curve (black line) is always shown. As photons accumulate, 
+            the blue histogram columns converge to this theoretical distribution.
+            <br><br>
+            <strong>Convergence metric:</strong> The plot below shows the Mean Squared Error (MSE) between 
+            the normalized Monte Carlo histogram and the normalized theoretical Planck distribution. 
+            Both distributions are normalized to sum to 1 (probability densities) before comparison, which allows 
+            proper convergence tracking regardless of the total number of photons. 
+            As this MSE value decreases toward zero, the simulation better matches the theory. 
+            The convergence follows approximately a 1/√N behavior, where N is the number of photons, 
+            meaning you need 4× more photons to halve the error.
+            <br><br>
+            <strong>Save Data:</strong> After running the simulation, click "Save Data to File" to export all generated 
+            wavelength values. You can choose between a simple list format, CSV format, or a detailed format that includes 
+            simulation parameters and statistics. Click "Save Convergence Data" to export the convergence metric evolution 
+            as a CSV file, showing how the MSE between the normalized Monte Carlo histogram and theoretical curve decreases over time.
+        </div>
+    </div>
+    
+    <script>
+        // Constants
+        const h = 6.62607015e-34;  // Planck constant (J·s)
+        const c = 299792458;        // Speed of light (m/s)
+        const kB = 1.380649e-23;    // Boltzmann constant (J/K)
+        
+        // Convert wavelength (in nm) to approximate RGB color
+        function wavelengthToRGB(wavelength) {
+            let r, g, b;
+            
+            if (wavelength >= 380 && wavelength < 440) {
+                r = -(wavelength - 440) / (440 - 380);
+                g = 0.0;
+                b = 1.0;
+            } else if (wavelength >= 440 && wavelength < 490) {
+                r = 0.0;
+                g = (wavelength - 440) / (490 - 440);
+                b = 1.0;
+            } else if (wavelength >= 490 && wavelength < 510) {
+                r = 0.0;
+                g = 1.0;
+                b = -(wavelength - 510) / (510 - 490);
+            } else if (wavelength >= 510 && wavelength < 580) {
+                r = (wavelength - 510) / (580 - 510);
+                g = 1.0;
+                b = 0.0;
+            } else if (wavelength >= 580 && wavelength < 645) {
+                r = 1.0;
+                g = -(wavelength - 645) / (645 - 580);
+                b = 0.0;
+            } else if (wavelength >= 645 && wavelength <= 780) {
+                r = 1.0;
+                g = 0.0;
+                b = 0.0;
+            } else {
+                // Outside visible spectrum
+                r = 0.0;
+                g = 0.0;
+                b = 0.0;
+            }
+            
+            // Intensity adjustment for wavelengths near visibility limits
+            let intensity = 1.0;
+            if (wavelength >= 380 && wavelength < 420) {
+                intensity = 0.3 + 0.7 * (wavelength - 380) / (420 - 380);
+            } else if (wavelength >= 700 && wavelength <= 780) {
+                intensity = 0.3 + 0.7 * (780 - wavelength) / (780 - 700);
+            }
+            
+            r = Math.round(r * intensity * 255);
+            g = Math.round(g * intensity * 255);
+            b = Math.round(b * intensity * 255);
+            
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+        
+        // Calculate approximate blackbody color by integrating over visible spectrum
+        function getBlackbodyColor(T) {
+            // For low temperatures where peak is far in infrared, return black
+            const peakWavelength = getPeakWavelength(T);
+            
+            // If temperature is too low (peak far into infrared), it appears black
+            if (T < 800) {
+                return 'rgb(0, 0, 0)';
+            }
+            
+            // For temperatures where we emit significant visible light,
+            // calculate weighted average of visible spectrum
+            const visibleMin = 380; // nm
+            const visibleMax = 780; // nm
+            const nSamples = 50;
+            
+            let totalR = 0, totalG = 0, totalB = 0;
+            let totalIntensity = 0;
+            
+            for (let i = 0; i < nSamples; i++) {
+                const lambda = visibleMin + (visibleMax - visibleMin) * i / (nSamples - 1);
+                const lambdaM = lambda * 1e-9; // Convert to meters
+                
+                // Planck's law for spectral radiance
+                const intensity = planckSpectralEmissivePower(lambdaM, T);
+                
+                // Get RGB for this wavelength
+                const color = wavelengthToRGB(lambda);
+                const rgb = color.match(/\d+/g).map(Number);
+                
+                totalR += rgb[0] * intensity;
+                totalG += rgb[1] * intensity;
+                totalB += rgb[2] * intensity;
+                totalIntensity += intensity;
+            }
+            
+            if (totalIntensity === 0) {
+                return 'rgb(0, 0, 0)';
+            }
+            
+            // Normalize
+            let r = totalR / totalIntensity;
+            let g = totalG / totalIntensity;
+            let b = totalB / totalIntensity;
+            
+            // Scale to make brighter at higher temperatures
+            const brightnessScale = Math.min(1.0, Math.pow(T / 6000, 0.5));
+            r *= brightnessScale;
+            g *= brightnessScale;
+            b *= brightnessScale;
+            
+            r = Math.min(255, Math.round(r));
+            g = Math.min(255, Math.round(g));
+            b = Math.min(255, Math.round(b));
+            
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+        
+        // Get peak wavelength using Wien's displacement law
+        function getPeakWavelength(T) {
+            const b = 2.897771955e-3; // Wien's displacement constant (m·K)
+            return (b / T) * 1e9; // Convert to nm
+        }
+        
+        // Simulation state
+        let accepted = [];
+        let totalTrials = 0;
+        let isRunning = false;
+        let isPaused = false;
+        let animationId = null;
+        let convergenceHistory = [];
+        
+        // Get current parameters
+        function getParams() {
+            return {
+                T: parseFloat(document.getElementById('temp').value),
+                lamMin: parseFloat(document.getElementById('lam-min').value) * 1e-9, // nm to m
+                lamMax: parseFloat(document.getElementById('lam-max').value) * 1e-9, // nm to m
+                nPhotons: parseInt(document.getElementById('n-photons').value),
+                nBins: parseInt(document.getElementById('n-bins').value),
+                updateEvery: parseInt(document.getElementById('update-every').value)
+            };
+        }
+        
+        // Update parameter displays
+        function updateDisplays() {
+            const temp = parseInt(document.getElementById('temp').value);
+            document.getElementById('temp-val').textContent = temp + ' K';
+            
+            // Update temperature color indicator with actual blackbody color
+            const color = getBlackbodyColor(temp);
+            document.getElementById('temp-color').style.backgroundColor = color;
+            
+            document.getElementById('lam-min-val').textContent = document.getElementById('lam-min').value + ' nm';
+            document.getElementById('lam-max-val').textContent = document.getElementById('lam-max').value + ' nm';
+            
+            const nPhotons = parseInt(document.getElementById('n-photons').value);
+            document.getElementById('n-photons-val').textContent = nPhotons.toLocaleString();
+            
+            document.getElementById('n-bins-val').textContent = document.getElementById('n-bins').value;
+            document.getElementById('update-val').textContent = document.getElementById('update-every').value;
+        }
+        
+        // Update statistics display
+        function updateStats() {
+            document.getElementById('accepted-count').textContent = accepted.length.toLocaleString();
+            document.getElementById('total-trials').textContent = totalTrials.toLocaleString();
+            
+            const acceptanceRate = totalTrials > 0 ? (accepted.length / totalTrials * 100).toFixed(2) : 0;
+            document.getElementById('acceptance-rate').textContent = acceptanceRate + '%';
+            
+            // Enable save button if we have data
+            document.getElementById('save-btn').disabled = accepted.length === 0;
+            
+            // Enable convergence save button if we have convergence data
+            document.getElementById('save-convergence-btn').disabled = convergenceHistory.length === 0;
+        }
+        
+        // Planck's spectral emissive power
+        function planckSpectralEmissivePower(lambda, T) {
+            const numerator = 2 * Math.PI * h * c * c;
+            const denominator = Math.pow(lambda, 5) * (Math.exp((h * c) / (lambda * kB * T)) - 1);
+            return numerator / denominator; // W/m³
+        }
+        
+        // Calculate theoretical Planck curve
+        function calculatePlanckCurve(lamMin, lamMax, T, nPoints = 300) {
+            const lambdas = [];
+            const values = [];
+            
+            for (let i = 0; i < nPoints; i++) {
+                const lam = lamMin + (lamMax - lamMin) * i / (nPoints - 1);
+                lambdas.push(lam * 1e9); // Convert to nm for display
+                values.push(planckSpectralEmissivePower(lam, T) * 1e-9); // Convert to W/(m²·nm)
+            }
+            
+            return { lambdas, values };
+        }
+        
+        // Calculate convergence metric
+        function calculateConvergence(acceptedPhotons, nBins, lamMin, lamMax, T) {
+            if (acceptedPhotons.length === 0) return null;
+            
+            const histogram = createHistogram(acceptedPhotons, nBins, lamMin, lamMax, T);
+            const planckCurve = calculatePlanckCurve(lamMin, lamMax, T, nBins);
+            
+            // Normalize both distributions to probability densities (sum to 1)
+            const histSum = histogram.counts.reduce((sum, val) => sum + val, 0);
+            const planckSum = planckCurve.values.reduce((sum, val) => sum + val, 0);
+            
+            // Calculate Mean Squared Error (MSE) between normalized distributions
+            let mse = 0;
+            for (let i = 0; i < nBins; i++) {
+                const mcNormalized = histSum > 0 ? histogram.counts[i] / histSum : 0;
+                const planckNormalized = planckSum > 0 ? planckCurve.values[i] / planckSum : 0;
+                const diff = mcNormalized - planckNormalized;
+                mse += diff * diff;
+            }
+            mse /= nBins; // Average over bins
+            
+            return mse;
+        }
+        
+        // Update convergence plot
+        function updateConvergencePlot() {
+            if (convergenceHistory.length === 0) {
+                Plotly.newPlot('convergence-plot', [], {
+                    title: 'Convergence Metric: Mean Squared Error (MSE)',
+                    xaxis: { title: 'Number of Photons' },
+                    yaxis: { title: 'MSE (normalized distributions)', exponentformat: 'e' }
+                });
+                return;
+            }
+            
+            const trace = {
+                x: convergenceHistory.map(d => d.photons),
+                y: convergenceHistory.map(d => d.metric),
+                type: 'scatter',
+                mode: 'lines',
+                name: 'MSE Convergence',
+                line: {
+                    color: '#667eea',
+                    width: 2
+                }
+            };
+            
+            // Add theoretical 1/sqrt(N) reference line
+            // Fit to the actual data for better visualization
+            const firstPoint = convergenceHistory[0];
+            const scalingFactor = firstPoint.metric * Math.sqrt(firstPoint.photons);
+            
+            const referenceTrace = {
+                x: convergenceHistory.map(d => d.photons),
+                y: convergenceHistory.map(d => scalingFactor / Math.sqrt(d.photons)),
+                type: 'scatter',
+                mode: 'lines',
+                name: '∝ 1/√N (theoretical)',
+                line: {
+                    color: 'rgba(0,0,0,0.3)',
+                    width: 2,
+                    dash: 'dash'
+                }
+            };
+            
+            const layout = {
+                title: 'Convergence Metric: Mean Squared Error (MSE)',
+                xaxis: {
+                    title: 'Number of Photons',
+                    gridcolor: 'rgba(0,0,0,0.1)'
+                },
+                yaxis: {
+                    title: 'MSE (normalized distributions)',
+                    gridcolor: 'rgba(0,0,0,0.1)',
+                    exponentformat: 'e',
+                    showexponent: 'all'
+                },
+                plot_bgcolor: 'rgba(240,240,240,0.3)',
+                paper_bgcolor: 'white',
+                showlegend: true,
+                legend: {
+                    x: 0.7,
+                    y: 0.95
+                }
+            };
+            
+            Plotly.newPlot('convergence-plot', [trace, referenceTrace], layout, { responsive: true });
+        }
+        
+        // Create histogram from accepted photons
+        function createHistogram(acceptedPhotons, nBins, lamMin, lamMax, T) {
+            const binWidth = (lamMax - lamMin) / nBins;
+            const bins = new Array(nBins).fill(0);
+            const binCenters = [];
+            
+            for (let i = 0; i < nBins; i++) {
+                binCenters.push((lamMin + (i + 0.5) * binWidth) * 1e9); // Convert to nm
+            }
+            
+            // Count photons in each bin
+            acceptedPhotons.forEach(lam => {
+                const binIndex = Math.floor((lam - lamMin) / binWidth);
+                if (binIndex >= 0 && binIndex < nBins) {
+                    bins[binIndex]++;
+                }
+            });
+            
+            // Calculate expected Planck value at bin centers for normalization
+            const planckAtBins = binCenters.map(lam_nm => {
+                return planckSpectralEmissivePower(lam_nm * 1e-9, T);
+            });
+            
+            // Integrate to get normalization factor
+            let planckIntegral = 0;
+            for (let i = 0; i < nBins; i++) {
+                planckIntegral += planckAtBins[i] * binWidth;
+            }
+            
+            const totalCounts = bins.reduce((sum, count) => sum + count, 0);
+            
+            // Scale histogram to match Planck curve amplitude
+            const scaledBins = bins.map((count, i) => {
+                if (totalCounts === 0) return 0;
+                // Convert counts to spectral emissive power units
+                return (count / (totalCounts * binWidth)) * planckIntegral * 1e-9; // W/(m²·nm)
+            });
+            
+            return { binCenters, counts: scaledBins, binWidth: binWidth * 1e9 };
+        }
+        
+        // Update plot
+        function updatePlot() {
+            const params = getParams();
+            const planckCurve = calculatePlanckCurve(params.lamMin, params.lamMax, params.T);
+            
+            const traces = [];
+            
+            // Always add Planck curve first (so it's visible even with no data)
+            traces.push({
+                x: planckCurve.lambdas,
+                y: planckCurve.values,
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Planck curve (theoretical)',
+                line: {
+                    color: 'black',
+                    width: 3
+                }
+            });
+            
+            // Add histogram if we have accepted photons
+            if (accepted.length > 0) {
+                const histogram = createHistogram(accepted, params.nBins, params.lamMin, params.lamMax, params.T);
+                
+                traces.push({
+                    x: histogram.binCenters,
+                    y: histogram.counts,
+                    type: 'bar',
+                    name: 'Monte Carlo histogram',
+                    marker: {
+                        color: 'rgba(102, 126, 234, 0.6)',
+                        line: {
+                            color: 'rgba(102, 126, 234, 1)',
+                            width: 1
+                        }
+                    },
+                    width: histogram.binWidth * 0.9
+                });
+            }
+            
+            const layout = {
+                title: `Spectral Emissive Power - Blackbody at T = ${params.T} K`,
+                xaxis: {
+                    title: 'Wavelength λ (nm)',
+                    gridcolor: 'rgba(0,0,0,0.1)'
+                },
+                yaxis: {
+                    title: 'Spectral Emissive Power E<sub>λ</sub> (W/(m²·nm))',
+                    gridcolor: 'rgba(0,0,0,0.1)',
+                    exponentformat: 'e',
+                    showexponent: 'all'
+                },
+                plot_bgcolor: 'rgba(240,240,240,0.3)',
+                paper_bgcolor: 'white',
+                showlegend: true,
+                legend: {
+                    x: 0.6,
+                    y: 0.95
+                }
+            };
+            
+            Plotly.newPlot('plot', traces, layout, { responsive: true });
+        }
+        
+        // Monte Carlo step - generate photons in batches
+        function monteCarloStep() {
+            if (!isRunning || isPaused) return;
+            
+            const params = getParams();
+            
+            // Find max value of Planck function in range for rejection sampling
+            const lamGrid = [];
+            const nSamples = 200;
+            for (let i = 0; i < nSamples; i++) {
+                lamGrid.push(params.lamMin + (params.lamMax - params.lamMin) * i / (nSamples - 1));
+            }
+            const EMax = Math.max(...lamGrid.map(lam => planckSpectralEmissivePower(lam, params.T)));
+            
+            // Generate photons until next update
+            let photonsThisStep = 0;
+            const targetPhotons = Math.min(params.updateEvery, params.nPhotons - accepted.length);
+            
+            while (photonsThisStep < targetPhotons && accepted.length < params.nPhotons) {
+                // Random trial
+                const lamTrial = params.lamMin + Math.random() * (params.lamMax - params.lamMin);
+                const yTrial = Math.random() * EMax;
+                totalTrials++;
+                
+                // Accept/reject based on Planck spectral emissive power
+                if (yTrial < planckSpectralEmissivePower(lamTrial, params.T)) {
+                    accepted.push(lamTrial);
+                    photonsThisStep++;
+                }
+            }
+            
+            // Update display
+            updateStats();
+            updatePlot();
+            
+            // Calculate and track convergence metric
+            const convergenceMetric = calculateConvergence(accepted, params.nBins, params.lamMin, params.lamMax, params.T);
+            if (convergenceMetric !== null) {
+                convergenceHistory.push({
+                    photons: accepted.length,
+                    metric: convergenceMetric
+                });
+                updateConvergencePlot();
+            }
+            
+            // Continue or finish
+            if (accepted.length < params.nPhotons) {
+                animationId = requestAnimationFrame(monteCarloStep);
+            } else {
+                stopSimulation();
+            }
+        }
+        
+        // Start simulation
+        function startSimulation() {
+            if (accepted.length >= getParams().nPhotons) {
+                resetSimulation();
+            }
+            
+            isRunning = true;
+            isPaused = false;
+            document.getElementById('start-btn').disabled = true;
+            document.getElementById('pause-btn').disabled = false;
+            document.getElementById('pause-btn').textContent = '⏸ Pause';
+            
+            // Disable parameter controls during simulation
+            document.querySelectorAll('input[type="range"]').forEach(input => {
+                if (input.id !== 'update-every') {
+                    input.disabled = true;
+                }
+            });
+            
+            monteCarloStep();
+        }
+        
+        // Pause simulation
+        function pauseSimulation() {
+            isPaused = !isPaused;
+            document.getElementById('pause-btn').textContent = isPaused ? '▶ Resume' : '⏸ Pause';
+            
+            if (!isPaused && isRunning) {
+                monteCarloStep();
+            }
+        }
+        
+        // Stop simulation
+        function stopSimulation() {
+            isRunning = false;
+            isPaused = false;
+            document.getElementById('start-btn').disabled = false;
+            document.getElementById('pause-btn').disabled = true;
+            
+            // Re-enable parameter controls
+            document.querySelectorAll('input[type="range"]').forEach(input => {
+                input.disabled = false;
+            });
+            
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+        }
+        
+        // Reset simulation
+        function resetSimulation() {
+            stopSimulation();
+            accepted = [];
+            totalTrials = 0;
+            convergenceHistory = [];
+            updateStats();
+            updatePlot();
+            updateConvergencePlot();
+        }
+        
+        // Save data to file
+        function saveDataToFile() {
+            if (accepted.length === 0) {
+                alert('No data to save! Please run a simulation first.');
+                return;
+            }
+            
+            const params = getParams();
+            const format = document.querySelector('input[name="save-format"]:checked').value;
+            let content = '';
+            let filename = '';
+            
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            
+            if (format === 'simple') {
+                // Simple list format - one wavelength per line in nm
+                content = accepted.map(lam => (lam * 1e9).toFixed(6)).join('\n');
+                filename = `planck_wavelengths_${timestamp}.txt`;
+                
+            } else if (format === 'csv') {
+                // CSV format with headers
+                content = 'wavelength_nm,photon_index\n';
+                content += accepted.map((lam, idx) => `${(lam * 1e9).toFixed(6)},${idx + 1}`).join('\n');
+                filename = `planck_wavelengths_${timestamp}.csv`;
+                
+            } else if (format === 'detailed') {
+                // Detailed format with metadata
+                const acceptanceRate = (accepted.length / totalTrials * 100).toFixed(2);
+                
+                content = `Monte Carlo Planck Spectral Emissive Power Simulation
+Generated: ${new Date().toLocaleString()}
+
+SIMULATION PARAMETERS:
+Temperature (T): ${params.T} K
+Wavelength Range: ${(params.lamMin * 1e9).toFixed(1)} - ${(params.lamMax * 1e9).toFixed(1)} nm
+Total Photons Generated: ${accepted.length}
+Total Trials: ${totalTrials}
+Acceptance Rate: ${acceptanceRate}%
+Number of Bins: ${params.nBins}
+
+PHYSICAL CONSTANTS USED:
+Planck constant (h): ${h} J·s
+Speed of light (c): ${c} m/s
+Boltzmann constant (kB): ${kB} J/K
+
+WAVELENGTH DATA (in nanometers):
+photon_index,wavelength_nm
+`;
+                content += accepted.map((lam, idx) => `${idx + 1},${(lam * 1e9).toFixed(6)}`).join('\n');
+                filename = `planck_wavelengths_detailed_${timestamp}.txt`;
+            }
+            
+            // Create blob and download
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            // Show confirmation
+            alert(`Data saved successfully!\nFile: ${filename}\nTotal wavelengths: ${accepted.length}`);
+        }
+        
+        // Save convergence data to file
+        function saveConvergenceToFile() {
+            if (convergenceHistory.length === 0) {
+                alert('No convergence data to save! Please run a simulation first.');
+                return;
+            }
+            
+            const params = getParams();
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            
+            // Create CSV content with metadata header
+            let content = `# Monte Carlo Planck Convergence Metrics
+# Generated: ${new Date().toLocaleString()}
+# 
+# SIMULATION PARAMETERS:
+# Temperature (T): ${params.T} K
+# Wavelength Range: ${(params.lamMin * 1e9).toFixed(1)} - ${(params.lamMax * 1e9).toFixed(1)} nm
+# Total Photons: ${accepted.length}
+# Number of Bins: ${params.nBins}
+# 
+# CONVERGENCE METRIC: Mean Squared Error (MSE) between MC histogram and theoretical Planck curve
+# Lower values indicate better convergence to the theoretical distribution
+#
+photon_count,mse_convergence_metric
+`;
+            
+            // Add convergence data
+            content += convergenceHistory.map(point => 
+                `${point.photons},${point.metric.toExponential(6)}`
+            ).join('\n');
+            
+            const filename = `planck_convergence_${timestamp}.csv`;
+            
+            // Create blob and download
+            const blob = new Blob([content], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            // Show confirmation
+            alert(`Convergence data saved successfully!\nFile: ${filename}\nData points: ${convergenceHistory.length}`);
+        }
+        
+        // Event listeners
+        document.querySelectorAll('input[type="range"]').forEach(input => {
+            input.addEventListener('input', () => {
+                updateDisplays();
+                if (!isRunning) {
+                    // Update theoretical curve when parameters change
+                    updatePlot();
+                }
+            });
+        });
+        
+        document.getElementById('start-btn').addEventListener('click', startSimulation);
+        document.getElementById('pause-btn').addEventListener('click', pauseSimulation);
+        document.getElementById('reset-btn').addEventListener('click', resetSimulation);
+        document.getElementById('save-btn').addEventListener('click', saveDataToFile);
+        document.getElementById('save-convergence-btn').addEventListener('click', saveConvergenceToFile);
+        
+        // Initialize
+        updateDisplays();
+        updatePlot();
+    </script>
+</body>
+</html>
