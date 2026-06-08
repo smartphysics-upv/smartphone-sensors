@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crank-Slider System | SmartPhysics</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #080c14;
+            --panel: #0d1626;
+            --panel2: #111d30;
+            --accent: #00d4ff;
+            --accent2: #ff6b35;
+            --accent3: #7fff6e;
+            --text: #cde8ff;
+            --text-dim: #5a7a9a;
+            --border: #1e3a5f;
+            --glow: 0 0 20px rgba(0, 212, 255, 0.3);
+            --glow2: 0 0 20px rgba(255, 107, 53, 0.3);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Exo 2', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated grid background */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            padding: 30px 0 20px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 24px;
+            position: relative;
+        }
+
+        header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+        }
+
+        h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: clamp(1.4rem, 3vw, 2.2rem);
+            font-weight: 900;
+            letter-spacing: 3px;
+            color: var(--accent);
+            text-shadow: 0 0 30px rgba(0,212,255,0.5), 0 0 60px rgba(0,212,255,0.2);
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .badge {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 4px 14px;
+            border: 1px solid var(--accent);
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-family: 'Orbitron', monospace;
+            color: var(--accent);
+            letter-spacing: 2px;
+        }
+
+        /* Main layout */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .main-grid { grid-template-columns: 1fr; }
+        }
+
+        /* Panels */
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+        }
+
+        .panel-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 3px;
+            color: var(--accent);
+            text-transform: uppercase;
+            margin-bottom: 18px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* Controls */
+        .control-group {
+            margin-bottom: 18px;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .control-label span:first-child {
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            font-family: 'Share Tech Mono', monospace;
+            letter-spacing: 1px;
+        }
+
+        .control-value {
+            font-family: 'Orbitron', monospace;
+            font-size: 0.8rem;
+            color: var(--accent);
+            font-weight: 700;
+            background: rgba(0,212,255,0.08);
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(0,212,255,0.2);
+            min-width: 70px;
+            text-align: center;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent) var(--pct, 50%), var(--border) var(--pct, 50%));
+            border-radius: 2px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(0,212,255,0.6);
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* Divider */
+        .divider {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 18px 0;
+        }
+
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            flex-direction: column;
+        }
+
+        button {
+            font-family: 'Orbitron', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 2px;
+            padding: 10px 16px;
+            border: 1px solid;
+            border-radius: 6px;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .btn-primary {
+            background: rgba(0,212,255,0.1);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .btn-primary:hover {
+            background: rgba(0,212,255,0.2);
+            box-shadow: var(--glow);
+        }
+
+        .btn-warning {
+            background: rgba(255,107,53,0.1);
+            border-color: var(--accent2);
+            color: var(--accent2);
+        }
+        .btn-warning:hover {
+            background: rgba(255,107,53,0.2);
+            box-shadow: var(--glow2);
+        }
+
+        /* Canvas area */
+        .sim-panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .sim-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent2), transparent);
+        }
+
+        #simCanvas {
+            display: block;
+            width: 100%;
+            background: transparent;
+        }
+
+        .plots-panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 20px;
+            position: relative;
+        }
+
+        .plots-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent3), transparent);
+        }
+
+        #plotDiv {
+            width: 100%;
+            height: 320px;
+        }
+
+        /* Right column layout */
+        .right-col {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Time display */
+        .time-display {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            letter-spacing: 1px;
+        }
+
+        /* Status dot */
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-dim);
+            margin-right: 6px;
+            vertical-align: middle;
+            transition: background 0.3s;
+        }
+        .status-dot.running {
+            background: var(--accent3);
+            box-shadow: 0 0 8px var(--accent3);
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .status-bar {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 1px;
+            color: var(--text-dim);
+            margin-bottom: 10px;
+        }
+
+        /* Constraint warning */
+        .warning {
+            background: rgba(255,107,53,0.1);
+            border: 1px solid rgba(255,107,53,0.4);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.72rem;
+            color: var(--accent2);
+            margin-top: 10px;
+            display: none;
+            font-family: 'Share Tech Mono', monospace;
+            letter-spacing: 0.5px;
+        }
+
+        .warning.show { display: block; }
+
+        /* Export section */
+        .btn-export {
+            background: rgba(127,255,110,0.08);
+            border-color: var(--accent3);
+            color: var(--accent3);
+        }
+        .btn-export:hover {
+            background: rgba(127,255,110,0.18);
+            box-shadow: 0 0 20px rgba(127,255,110,0.25);
+        }
+        .btn-export:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        .export-note {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            margin-top: 6px;
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+
+        /* Toast notification */
+        #toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: var(--panel2);
+            border: 1px solid var(--accent3);
+            color: var(--accent3);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            padding: 10px 24px;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(127,255,110,0.2);
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            pointer-events: none;
+            z-index: 9999;
+        }
+        #toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <header>
+        <h1>⚙ CRANK-SLIDER SYSTEM</h1>
+        <div class="subtitle">Rotary-to-Linear Motion Kinematics</div>
+        <div class="badge">SmartPhysics Group</div>
+    </header>
+
+    <div class="main-grid">
+
+        <!-- LEFT: Controls -->
+        <div class="panel">
+            <div class="panel-title">◈ System Parameters</div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Crank Radius R</span>
+                    <span class="control-value" id="R-val">6.0 cm</span>
+                </div>
+                <input type="range" id="R" min="0" max="12" step="0.1" value="6">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Rod Length L</span>
+                    <span class="control-value" id="L-val">20.0 cm</span>
+                </div>
+                <input type="range" id="L" min="0" max="45" step="0.5" value="20">
+            </div>
+
+            <div id="constraint-warn" class="warning">
+                ⚠ L must be ≥ R for valid motion
+            </div>
+
+            <hr class="divider">
+            <div class="panel-title">◈ Motion Parameters</div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Angular Velocity ω</span>
+                    <span class="control-value" id="w-val">1.0 rad/s</span>
+                </div>
+                <input type="range" id="w" min="0" max="5" step="0.05" value="1">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Initial Angle θ₀</span>
+                    <span class="control-value" id="theta-val">0.00 rad</span>
+                </div>
+                <input type="range" id="theta" min="0" max="1.5708" step="0.01" value="0">
+            </div>
+
+            <hr class="divider">
+            <div class="panel-title">◈ Control</div>
+
+            <div class="status-bar">
+                <span class="status-dot" id="status-dot"></span>
+                <span id="status-txt">STOPPED</span>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn-primary" id="playBtn" onclick="togglePlay()">▶ START SIMULATION</button>
+                <button class="btn-warning" id="resetBtn" onclick="resetSim()">↺ RESET</button>
+            </div>
+
+            <hr class="divider">
+            <div class="panel-title">◈ Export</div>
+
+            <div class="btn-group">
+                <button class="btn-export" id="csvBtn" onclick="exportCSV()">⬇ Export Data (CSV)</button>
+                <button class="btn-export" id="pngBtn" onclick="exportScreenshot()">📷 Save Screenshot (PNG)</button>
+            </div>
+            <div class="export-note" id="export-note">Run simulation to collect data first</div>
+        </div>
+
+        <!-- RIGHT column -->
+        <div class="right-col">
+
+            <!-- Simulation Canvas -->
+            <div class="sim-panel">
+                <canvas id="simCanvas" height="320"></canvas>
+                <div class="time-display" id="timeDisplay">t = 0.000 s</div>
+            </div>
+
+            <!-- Plots -->
+            <div class="plots-panel">
+                <div class="panel-title">◈ Kinematic Plots — x(t), v(t), a(t)</div>
+                <div id="plotDiv"></div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<div id="toast">✓ File saved</div>
+
+<script>
+    // ─── Toast helper ────────────────────────────────────────────────────────
+    function showToast(msg) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 2800);
+    }
+
+    // ─── Export: CSV ─────────────────────────────────────────────────────────
+    function exportCSV() {
+        if (tData.length === 0) {
+            showToast('⚠ No data — run the simulation first');
+            return;
+        }
+        const R = getR(), L = getL(), w = getW(), th = getTheta();
+        const Rcm = getRcm(), Lcm = getLcm();
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        let csv = '# Crank-Slider System — SmartPhysics Group\n';
+        csv += `# Generated: ${new Date().toLocaleString()}\n`;
+        csv += `# R=${Rcm.toFixed(2)} cm (${R.toFixed(4)} m) | L=${Lcm.toFixed(2)} cm (${L.toFixed(4)} m) | omega=${w.toFixed(3)} rad/s | theta0=${th.toFixed(4)} rad\n`;
+        csv += '# All kinematic quantities in SI units (m, m/s, m/s²)\n';
+        csv += '#\n';
+        csv += 't_s,x_m,v_m_s,a_m_s2\n';
+        for (let i = 0; i < tData.length; i++) {
+            csv += `${tData[i].toFixed(6)},${xData[i].toFixed(6)},${vData[i].toFixed(6)},${aData[i].toFixed(6)}\n`;
+        }
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `crank_slider_${timestamp}.csv`;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+        showToast(`✓ Saved ${tData.length.toLocaleString()} rows → CSV`);
+    }
+
+    // ─── Export: Screenshot ───────────────────────────────────────────────────
+    async function exportScreenshot() {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const btn = document.getElementById('pngBtn');
+        btn.textContent = '⏳ Capturing...';
+        btn.disabled = true;
+        try {
+            const cont = document.querySelector('.container');
+            const cap = await html2canvas(cont, {
+                backgroundColor: '#080c14', scale: 2,
+                useCORS: true, allowTaint: true, logging: false
+            });
+            const url = cap.toDataURL('image/png');
+            const a = document.createElement('a');
+            a.href = url; a.download = `crank_slider_screenshot_${timestamp}.png`;
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a);
+            showToast('✓ Screenshot saved → PNG');
+        } catch(e) {
+            showToast('⚠ Screenshot failed — try pausing first');
+        }
+        btn.textContent = '📷 Save Screenshot (PNG)';
+        btn.disabled = false;
+    }
+
+    // ─── Update export note ───────────────────────────────────────────────────
+    function updateExportNote() {
+        const note = document.getElementById('export-note');
+        note.textContent = tData.length === 0
+            ? 'Run simulation to collect data first'
+            : `${tData.length.toLocaleString()} data points recorded`;
+    }
+
+    // ─── State ───────────────────────────────────────────────────────────────
+    let running = false;
+    let animId = null;
+    let t = 0;
+    let lastTimestamp = null;
+    const T_WINDOW = 50; // seconds of rolling plot window
+
+    // Time series data — all stored in SI (m, m/s, m/s²)
+    let tData = [], xData = [], vData = [], aData = [];
+
+    // ─── Parameter getters (sliders in cm, returns SI metres) ─────────────────
+    function getR() { return parseFloat(document.getElementById('R').value) / 100; }  // cm → m
+    function getL() { return parseFloat(document.getElementById('L').value) / 100; }  // cm → m
+    function getW() { return parseFloat(document.getElementById('w').value); }         // rad/s
+    function getTheta() { return parseFloat(document.getElementById('theta').value); } // rad
+    // Raw cm values for display only
+    function getRcm() { return parseFloat(document.getElementById('R').value); }
+    function getLcm() { return parseFloat(document.getElementById('L').value); }
+
+    // ─── Kinematics ───────────────────────────────────────────────────────────
+    function computeX(t, R, L, w, th) {
+        const phi = w * t + th;
+        const s = Math.sin(phi);
+        const inner = Math.max(1e-18, L * L - R * R * s * s);
+        return R * Math.cos(phi) + Math.sqrt(inner);
+    }
+
+    function computeV(t, R, L, w, th) {
+        const phi = w * t + th;
+        const s = Math.sin(phi);
+        const c = Math.cos(phi);
+        const inner = Math.max(1e-18, L * L - R * R * s * s);
+        return -w * R * s - (w * R * R * s * c) / Math.sqrt(inner);
+    }
+
+    function computeA(t, R, L, w, th) {
+        const phi = w * t + th;
+        const s = Math.sin(phi);
+        const c = Math.cos(phi);
+        const inner = Math.max(1e-18, L * L - R * R * s * s);
+        const num = L * L * s * s - L * L * c * c - R * R * Math.pow(s, 4);
+        return -w * w * R * c + (w * w * R * R * num) / Math.pow(inner, 1.5);
+    }
+
+    // ─── Slider initialization: update gradient ───────────────────────────────
+    function updateSliderTrack(el) {
+        const min = parseFloat(el.min), max = parseFloat(el.max), val = parseFloat(el.value);
+        const pct = ((val - min) / (max - min) * 100).toFixed(1) + '%';
+        el.style.setProperty('--pct', pct);
+    }
+
+    function updateDisplays() {
+        const Rcm = getRcm(), Lcm = getLcm(), w = getW(), th = getTheta();
+
+        document.getElementById('R-val').textContent = Rcm.toFixed(1) + ' cm';
+        document.getElementById('L-val').textContent = Lcm.toFixed(1) + ' cm';
+        document.getElementById('w-val').textContent = w.toFixed(2) + ' rad/s';
+        document.getElementById('theta-val').textContent = th.toFixed(2) + ' rad';
+
+        const warn = document.getElementById('constraint-warn');
+        if (Lcm < Rcm) {
+            warn.classList.add('show');
+        } else {
+            warn.classList.remove('show');
+        }
+
+        ['R', 'L', 'w', 'theta'].forEach(id => updateSliderTrack(document.getElementById(id)));
+
+        // Redraw canvas in stopped state
+        if (!running) {
+            drawCanvas(t);
+        }
+    }
+
+    // ─── Canvas drawing ───────────────────────────────────────────────────────
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+        const W = canvas.parentElement.clientWidth;
+        canvas.width = W;
+        canvas.height = 320;
+    }
+
+    function drawCanvas(t) {
+        const Rcm = getRcm(), Lcm = getLcm(), w = getW(), th = getTheta();
+        const R = Rcm / 100, L = Lcm / 100; // SI for kinematics
+        const W = canvas.width, H = canvas.height;
+
+        // Clear
+        ctx.clearRect(0, 0, W, H);
+
+        // Background subtle grid
+        ctx.strokeStyle = 'rgba(0,212,255,0.04)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < W; x += 30) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+        for (let y = 0; y < H; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+        if (Rcm === 0 || Lcm < Rcm) {
+            ctx.font = '14px Orbitron, monospace';
+            ctx.fillStyle = '#ff6b35';
+            ctx.textAlign = 'center';
+            ctx.fillText('Invalid parameters: L must be ≥ R > 0', W / 2, H / 2);
+            return;
+        }
+
+        // Scale using cm values for canvas geometry
+        // totalMax = R + L is the rightmost slider position.
+        // The crank pivot must sit at least R from the left margin so the full
+        // crank circle is always visible. We fit everything in usableW.
+        const totalMax = Rcm + Lcm;   // rightmost x from pivot (cm)
+        const marginLeft = 55;
+        const marginRight = 30;
+        const usableW = W - marginLeft - marginRight;
+
+        // Scale so that the full sweep (from pivot−R on the left to pivot+totalMax
+        // on the right) fits, with a 10 % breathing margin.
+        const spanCm = Rcm + totalMax;   // left extent R + right extent (R+L)
+        const scale = usableW / (spanCm * 1.10);   // pixels per cm
+
+        // Crank center: leave at least R*scale px after marginLeft
+        const cx = marginLeft + Rcm * scale;
+        const cy = H / 2;
+
+        const phi = w * t + th;
+        const crankX_cm = Rcm * Math.cos(phi);
+        const crankY_cm = Rcm * Math.sin(phi);
+
+        // Crank pin in canvas coords
+        const pinX = cx + crankX_cm * scale;
+        const pinY = cy - crankY_cm * scale;
+
+        // Compute slider x in cm — clamp inner to ε² so R=L never returns NaN
+        const EPS2 = 1e-9;
+        const inner = Math.max(EPS2, Lcm * Lcm - Rcm * Rcm * Math.sin(phi) * Math.sin(phi));
+        const sliderX_cm = crankX_cm + Math.sqrt(inner);
+        const sliderX = cx + sliderX_cm * scale;
+        const sliderY = cy;
+
+        // ── Draw guide rail ──
+        ctx.save();
+        const railH = 22;
+        // Rail runs from left of crank circle to rightmost slider position + margin
+        const railX0 = cx - Rcm * scale - 8;
+        const railX1 = cx + totalMax * scale + 24;
+        // Rail body
+        ctx.fillStyle = 'rgba(30,58,95,0.6)';
+        ctx.strokeStyle = '#1e3a5f';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.rect(railX0, cy - railH / 2, railX1 - railX0, railH);
+        ctx.fill();
+        ctx.stroke();
+        // Rail highlight
+        ctx.strokeStyle = 'rgba(0,212,255,0.3)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(railX0, cy - railH / 2);
+        ctx.lineTo(railX1, cy - railH / 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(railX0, cy + railH / 2);
+        ctx.lineTo(railX1, cy + railH / 2);
+        ctx.stroke();
+        ctx.restore();
+
+        // ── Draw connecting rod ──
+        ctx.save();
+        ctx.strokeStyle = '#00d4ff';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = '#00d4ff';
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.moveTo(pinX, pinY);
+        ctx.lineTo(sliderX, sliderY);
+        ctx.stroke();
+        ctx.restore();
+
+        // ── Draw crank arm ──
+        ctx.save();
+        ctx.strokeStyle = '#ff6b35';
+        ctx.lineWidth = 4;
+        ctx.shadowColor = '#ff6b35';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(pinX, pinY);
+        ctx.stroke();
+        ctx.restore();
+
+        // ── Draw crank circle (ghost) ──
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,107,53,0.2)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.arc(cx, cy, Rcm * scale, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        // ── Draw crank pivot ──
+        ctx.save();
+        ctx.fillStyle = '#ff6b35';
+        ctx.shadowColor = '#ff6b35';
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#1a1a2e';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // ── Draw crank pin (rotating end) ──
+        ctx.save();
+        ctx.fillStyle = '#ff6b35';
+        ctx.shadowColor = '#ff6b35';
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(pinX, pinY, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // ── Draw slider ──
+        const sliderW = 40, sliderH = 36;
+        ctx.save();
+        ctx.fillStyle = '#0d1626';
+        ctx.strokeStyle = '#00d4ff';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = '#00d4ff';
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.rect(sliderX - sliderW / 2, sliderY - sliderH / 2, sliderW, sliderH);
+        ctx.fill();
+        ctx.stroke();
+
+        // Slider highlight
+        ctx.fillStyle = 'rgba(0,212,255,0.15)';
+        ctx.beginPath();
+        ctx.rect(sliderX - sliderW / 2 + 4, sliderY - sliderH / 2 + 4, sliderW - 8, 8);
+        ctx.fill();
+        ctx.restore();
+
+        // ── Slider pin ──
+        ctx.save();
+        ctx.fillStyle = '#00d4ff';
+        ctx.shadowColor = '#00d4ff';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(sliderX, sliderY, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // ── x dimension annotation ──
+        const x_m = computeX(t, R, L, w, th);
+        if (x_m !== null) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(127,255,110,0.5)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            // line from crank center to slider
+            ctx.beginPath();
+            ctx.moveTo(cx, cy + railH / 2 + 14);
+            ctx.lineTo(sliderX, cy + railH / 2 + 14);
+            ctx.stroke();
+            // arrows
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#7fff6e';
+            ctx.beginPath(); ctx.moveTo(cx, cy + railH / 2 + 14); ctx.lineTo(cx + 7, cy + railH / 2 + 10); ctx.lineTo(cx + 7, cy + railH / 2 + 18); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(sliderX, cy + railH / 2 + 14); ctx.lineTo(sliderX - 7, cy + railH / 2 + 10); ctx.lineTo(sliderX - 7, cy + railH / 2 + 18); ctx.fill();
+            ctx.font = '12px Share Tech Mono, monospace';
+            ctx.fillStyle = '#7fff6e';
+            ctx.textAlign = 'center';
+            ctx.fillText('x = ' + x_m.toFixed(4) + ' m', (cx + sliderX) / 2, cy + railH / 2 + 32);
+            ctx.restore();
+        }
+
+        // ── Labels ──
+        ctx.font = '11px Share Tech Mono, monospace';
+        ctx.fillStyle = 'rgba(255,107,53,0.8)';
+        ctx.textAlign = 'center';
+        ctx.fillText('R=' + Rcm.toFixed(1) + ' cm', cx + (pinX - cx) / 2, cy - (cy - pinY) / 2 - 6);
+
+        ctx.fillStyle = 'rgba(0,212,255,0.7)';
+        ctx.fillText('L=' + Lcm.toFixed(1) + ' cm', (pinX + sliderX) / 2, (pinY + sliderY) / 2 - 10);
+
+        // ── Angle arc ──
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,107,53,0.4)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, Rcm * scale * 0.35, 0, -phi, phi > 0);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,107,53,0.7)';
+        ctx.font = '11px Share Tech Mono, monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('φ', cx + Rcm * scale * 0.4, cy - 5);
+        ctx.restore();
+
+        // ── Motor symbol ──
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,107,53,0.4)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, Rcm * scale + 12, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,107,53,0.15)';
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // ─── Plot ─────────────────────────────────────────────────────────────────
+    let plotInitialized = false;
+
+    function initPlot() {
+        const layout = {
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(13,22,38,0.6)',
+            font: { family: 'Share Tech Mono, monospace', size: 11, color: '#5a7a9a' },
+            margin: { t: 10, b: 40, l: 55, r: 10 },
+            legend: {
+                orientation: 'h',
+                x: 0.5, xanchor: 'center', y: 1.08,
+                bgcolor: 'rgba(0,0,0,0)',
+                font: { size: 10, color: '#cde8ff' }
+            },
+            xaxis: {
+                title: { text: 't (s)', font: { size: 11 } },
+                gridcolor: 'rgba(30,58,95,0.8)',
+                zerolinecolor: 'rgba(30,58,95,1)',
+                color: '#5a7a9a'
+            },
+            yaxis: {
+                title: { text: 'x [m] | v [m/s] | a [m/s²]', font: { size: 10 } },
+                gridcolor: 'rgba(30,58,95,0.8)',
+                zerolinecolor: 'rgba(30,58,95,0.5)',
+                color: '#5a7a9a'
+            }
+        };
+
+        const traces = [
+            { x: [], y: [], name: 'x(t) [m]', line: { color: '#00d4ff', width: 2 }, mode: 'lines' },
+            { x: [], y: [], name: 'v(t) [m/s]', line: { color: '#ff6b35', width: 2 }, mode: 'lines' },
+            { x: [], y: [], name: 'a(t) [m/s²]', line: { color: '#7fff6e', width: 2 }, mode: 'lines' }
+        ];
+
+        Plotly.newPlot('plotDiv', traces, layout, { displayModeBar: false, responsive: true });
+        plotInitialized = true;
+    }
+
+    function updatePlot() {
+        if (!plotInitialized) return;
+        // Keep only last T_WINDOW seconds
+        const cutoff = t - T_WINDOW;
+        const idx = tData.findIndex(tv => tv >= cutoff);
+        const ts = idx > 0 ? tData.slice(idx) : tData;
+        const xs = idx > 0 ? xData.slice(idx) : xData;
+        const vs = idx > 0 ? vData.slice(idx) : vData;
+        const as_ = idx > 0 ? aData.slice(idx) : aData;
+
+        Plotly.restyle('plotDiv', { x: [ts, ts, ts], y: [xs, vs, as_] });
+    }
+
+    // ─── Animation loop ───────────────────────────────────────────────────────
+    function step(ts) {
+        if (!running) return;
+        if (lastTimestamp === null) lastTimestamp = ts;
+        const dt = (ts - lastTimestamp) / 1000;
+        lastTimestamp = ts;
+
+        t += dt;
+
+        const R = getR(), L = getL(), w = getW(), th = getTheta();
+        const x = computeX(t, R, L, w, th);
+        const v = computeV(t, R, L, w, th);
+        const a = computeA(t, R, L, w, th);
+
+        tData.push(t);
+        xData.push(x);
+        vData.push(v);
+        aData.push(a);
+
+        if (tData.length % 60 === 0) updateExportNote();
+
+        document.getElementById('timeDisplay').textContent = 't = ' + t.toFixed(3) + ' s';
+
+        drawCanvas(t);
+
+        // Update plot every ~8 frames
+        if (tData.length % 8 === 0) updatePlot();
+
+        animId = requestAnimationFrame(step);
+    }
+
+    // ─── Controls ─────────────────────────────────────────────────────────────
+    function togglePlay() {
+        const Rcm = getRcm(), Lcm = getLcm();
+        if (Lcm < Rcm) { return; }
+
+        running = !running;
+        const btn = document.getElementById('playBtn');
+        const dot = document.getElementById('status-dot');
+        const txt = document.getElementById('status-txt');
+
+        if (running) {
+            btn.textContent = '⏸ PAUSE';
+            dot.classList.add('running');
+            txt.textContent = 'RUNNING';
+            lastTimestamp = null;
+            animId = requestAnimationFrame(step);
+        } else {
+            btn.textContent = '▶ RESUME';
+            dot.classList.remove('running');
+            txt.textContent = 'PAUSED';
+            if (animId) cancelAnimationFrame(animId);
+        }
+    }
+
+    function resetSim() {
+        running = false;
+        if (animId) cancelAnimationFrame(animId);
+        t = 0;
+        lastTimestamp = null;
+        tData = []; xData = []; vData = []; aData = [];
+
+        const btn = document.getElementById('playBtn');
+        const dot = document.getElementById('status-dot');
+        const txt = document.getElementById('status-txt');
+        btn.textContent = '▶ START SIMULATION';
+        dot.classList.remove('running');
+        txt.textContent = 'STOPPED';
+
+        ['rd-x', 'rd-v', 'rd-a'].forEach(id => document.getElementById(id).textContent = '—');
+        document.getElementById('timeDisplay').textContent = 't = 0.000 s';
+        updateExportNote();
+
+        if (plotInitialized) {
+            Plotly.restyle('plotDiv', { x: [[], [], []], y: [[], [], []] });
+        }
+        drawCanvas(0);
+    }
+
+    // ─── Slider event listeners ───────────────────────────────────────────────
+    ['R', 'L', 'w', 'theta'].forEach(id => {
+        const el = document.getElementById(id);
+        el.addEventListener('input', () => {
+            updateDisplays();
+            if (!running) drawCanvas(t);
+        });
+    });
+
+    // ─── Init ─────────────────────────────────────────────────────────────────
+    window.addEventListener('resize', () => {
+        resizeCanvas();
+        drawCanvas(t);
+    });
+
+    resizeCanvas();
+    updateDisplays();
+    initPlot();
+    drawCanvas(0);
+</script>
+</body>
+</html>
