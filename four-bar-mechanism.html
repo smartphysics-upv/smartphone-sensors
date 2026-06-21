@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Four-Bar Mechanism | SmartPhysics</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root{
+            --bg:#080c14;--panel:#0d1626;--panel2:#111d30;
+            --accent:#00d4ff;--accent2:#ff6b35;--accent3:#7fff6e;--accent4:#c77dff;
+            --text:#cde8ff;--text-dim:#5a7a9a;--border:#1e3a5f;
+            --glow:0 0 20px rgba(0,212,255,0.3);--glow2:0 0 20px rgba(255,107,53,0.3);--glow3:0 0 20px rgba(127,255,110,0.3);
+        }
+        *{box-sizing:border-box;margin:0;padding:0;}
+        html,body{width:100%;min-height:100vh;}
+        body{font-family:'Exo 2',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;}
+        body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.04) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+
+        .container{position:relative;z-index:1;width:100%;max-width:1600px;margin:0 auto;padding:24px 32px;}
+
+        header{text-align:center;padding:30px 0 22px;border-bottom:1px solid var(--border);margin-bottom:28px;position:relative;}
+        header::after{content:'';position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);width:240px;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);}
+        h1{font-family:'Orbitron',monospace;font-size:clamp(1.6rem,3.5vw,2.6rem);font-weight:900;letter-spacing:4px;color:var(--accent);text-shadow:0 0 30px rgba(0,212,255,0.5),0 0 60px rgba(0,212,255,0.2);margin-bottom:8px;}
+        .subtitle{font-family:'Share Tech Mono',monospace;font-size:0.85rem;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;}
+        .badge{display:inline-block;margin-top:10px;padding:4px 16px;border:1px solid var(--accent);border-radius:20px;font-size:0.72rem;font-family:'Orbitron',monospace;color:var(--accent);letter-spacing:2px;}
+
+        /* Two-column layout */
+        .main-grid{display:grid;grid-template-columns:320px 1fr;gap:24px;align-items:start;}
+        @media(max-width:1024px){.main-grid{grid-template-columns:1fr;}}
+
+        .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:22px;position:relative;overflow:hidden;}
+        .panel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);}
+        .panel-title{font-family:'Orbitron',monospace;font-size:0.65rem;letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+
+        .control-group{margin-bottom:14px;}
+        .control-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+        .control-label span:first-child{font-size:0.8rem;color:var(--text-dim);font-family:'Share Tech Mono',monospace;letter-spacing:1px;}
+        .link-a{color:#ff6b35;}.link-b{color:#00d4ff;}.link-c{color:#c77dff;}.link-d{color:#ffd166;}
+
+        .input-row{display:flex;align-items:center;gap:8px;}
+        .input-row input[type="range"]{flex:1;}
+        .num-input{width:70px;font-family:'Orbitron',monospace;font-size:0.75rem;color:var(--accent);background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.25);border-radius:5px;padding:4px 6px;text-align:center;outline:none;}
+        .num-input:focus{border-color:var(--accent);box-shadow:0 0 8px rgba(0,212,255,0.3);}
+
+        input[type="range"]{-webkit-appearance:none;width:100%;height:4px;background:linear-gradient(90deg,var(--accent) var(--pct,50%),var(--border) var(--pct,50%));border-radius:2px;outline:none;cursor:pointer;}
+        input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;background:var(--accent);border-radius:50%;cursor:pointer;box-shadow:0 0 8px rgba(0,212,255,0.6);transition:transform 0.1s;}
+        input[type="range"]::-webkit-slider-thumb:hover{transform:scale(1.2);}
+
+        .divider{border:none;border-top:1px solid var(--border);margin:16px 0;}
+
+        /* Grashof banner */
+        .grashof-banner{border-radius:8px;padding:12px 14px;margin-bottom:12px;font-family:'Share Tech Mono',monospace;font-size:0.72rem;letter-spacing:0.5px;line-height:1.5;transition:background 0.3s,border-color 0.3s,color 0.3s;border:1px solid;}
+        .grashof-banner .g-type{font-family:'Orbitron',monospace;font-size:0.76rem;font-weight:700;margin-bottom:5px;letter-spacing:1.5px;}
+        .grashof-banner .g-cond{opacity:0.85;font-size:0.67rem;}
+        .grashof-banner.crank-rocker {background:rgba(0,212,255,0.08);border-color:rgba(0,212,255,0.4);color:#00d4ff;}
+        .grashof-banner.double-crank {background:rgba(127,255,110,0.08);border-color:rgba(127,255,110,0.4);color:#7fff6e;}
+        .grashof-banner.rocker-crank {background:rgba(199,125,255,0.08);border-color:rgba(199,125,255,0.4);color:#c77dff;}
+        .grashof-banner.double-rocker{background:rgba(255,107,53,0.08);border-color:rgba(255,107,53,0.4);color:#ff6b35;}
+        .grashof-banner.non-grashof  {background:rgba(255,80,80,0.08);border-color:rgba(255,80,80,0.4);color:#ff5050;}
+        .grashof-banner.change-point {background:rgba(255,209,102,0.08);border-color:rgba(255,209,102,0.4);color:#ffd166;}
+
+        .grashof-eq{font-family:'Share Tech Mono',monospace;font-size:0.68rem;color:var(--text-dim);background:rgba(0,0,0,0.3);border-radius:6px;padding:8px 12px;margin-bottom:12px;line-height:1.7;}
+        .grashof-eq .highlight{color:var(--accent3);font-weight:bold;}
+
+        /* Motion note */
+        .motion-note{font-family:'Share Tech Mono',monospace;font-size:0.67rem;color:var(--text-dim);background:rgba(0,0,0,0.2);border:1px solid var(--border);border-radius:6px;padding:7px 11px;margin-top:10px;line-height:1.6;}
+        .motion-note.oscillating{color:#ffd166;border-color:rgba(255,209,102,0.3);background:rgba(255,209,102,0.05);}
+
+        /* Buttons */
+        .btn-group{display:flex;flex-direction:column;gap:8px;}
+        button{font-family:'Orbitron',monospace;font-size:0.65rem;letter-spacing:2px;padding:11px 16px;border:1px solid;border-radius:6px;cursor:pointer;text-transform:uppercase;transition:all 0.2s;width:100%;}
+        .btn-primary{background:rgba(0,212,255,0.1);border-color:var(--accent);color:var(--accent);}
+        .btn-primary:hover{background:rgba(0,212,255,0.2);box-shadow:var(--glow);}
+        .btn-warning{background:rgba(255,107,53,0.1);border-color:var(--accent2);color:var(--accent2);}
+        .btn-warning:hover{background:rgba(255,107,53,0.2);box-shadow:var(--glow2);}
+        .btn-preset{background:rgba(127,255,110,0.06);border-color:rgba(127,255,110,0.3);color:var(--accent3);font-size:0.58rem;padding:8px 10px;}
+        .btn-preset:hover{background:rgba(127,255,110,0.14);box-shadow:var(--glow3);}
+        .preset-grid{display:grid;grid-template-columns:1fr;gap:6px;}
+
+        .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--text-dim);margin-right:6px;vertical-align:middle;transition:background 0.3s;}
+        .status-dot.running{background:var(--accent3);box-shadow:0 0 8px var(--accent3);animation:pulse 1s infinite;}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+        .status-bar{font-family:'Share Tech Mono',monospace;font-size:0.65rem;letter-spacing:1px;color:var(--text-dim);margin-bottom:10px;}
+
+        /* Right column */
+        .right-col{display:flex;flex-direction:column;gap:22px;}
+
+        /* Canvas panel */
+        .sim-panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden;position:relative;}
+        .sim-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent2),transparent);}
+        #simCanvas{display:block;width:100%;background:transparent;}
+
+        /* Top-of-simulation control bar */
+        .sim-controls{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:14px 20px;background:rgba(0,0,0,0.25);border-bottom:1px solid var(--border);}
+        .sim-controls .status-bar{margin-bottom:0;}
+        .sim-controls-btns{display:flex;gap:10px;}
+        .sim-controls-btns button{width:auto;padding:10px 22px;white-space:nowrap;}
+
+        .time-display{font-family:'Share Tech Mono',monospace;font-size:0.72rem;color:var(--text-dim);position:absolute;bottom:10px;right:14px;letter-spacing:1px;}
+
+        /* Readouts */
+        .readouts-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+        .readout{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;text-align:center;}
+        .readout-label{font-size:0.62rem;color:var(--text-dim);font-family:'Share Tech Mono',monospace;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px;}
+        .readout-val{font-family:'Orbitron',monospace;font-size:0.88rem;color:var(--accent);}
+
+        /* Plot panel */
+        .plots-panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;position:relative;}
+        .plots-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent3),transparent);}
+        #plotDiv{width:100%;height:320px;}
+        .curve-toggles{display:flex;flex-wrap:wrap;gap:18px;margin-bottom:12px;font-family:'Share Tech Mono',monospace;font-size:0.72rem;color:var(--text-dim);}
+        .curve-toggle{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;}
+        .curve-toggle input[type="checkbox"]{width:14px;height:14px;cursor:pointer;accent-color:var(--accent);}
+        .curve-toggle .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+
+        /* Legend */
+        .legend-row{display:flex;flex-wrap:wrap;gap:12px;padding:10px 16px;background:rgba(0,0,0,0.2);border-top:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:0.67rem;}
+        .legend-item{display:flex;align-items:center;gap:5px;color:var(--text-dim);}
+        .legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+
+        /* Toast */
+        #toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel2);border:1px solid var(--accent3);color:var(--accent3);font-family:'Share Tech Mono',monospace;font-size:0.76rem;letter-spacing:1px;padding:10px 26px;border-radius:8px;box-shadow:0 0 20px rgba(127,255,110,0.2);opacity:0;transition:opacity 0.3s,transform 0.3s;pointer-events:none;z-index:9999;}
+        #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>⚙ FOUR-BAR MECHANISM</h1>
+        <div class="subtitle">Grashof Law</div>
+        <div class="badge">SmartPhysics Group</div>
+    </header>
+
+    <div class="main-grid">
+        <!-- LEFT: Controls -->
+        <div class="panel" style="overflow-y:auto;max-height:calc(100vh - 140px);position:sticky;top:24px;">
+            <div class="panel-title">◈ Link Lengths (cm)</div>
+            <div class="control-group">
+                <div class="control-label"><span class="link-d">d — Ground (fixed)</span></div>
+                <div class="input-row"><input type="range" id="dSlider" min="1" max="20" step="0.1" value="8"><input type="number" id="dNum" class="num-input" min="1" max="20" step="0.1" value="8"></div>
+            </div>
+            <div class="control-group">
+                <div class="control-label"><span class="link-a">a — Input</span></div>
+                <div class="input-row"><input type="range" id="aSlider" min="1" max="20" step="0.1" value="3"><input type="number" id="aNum" class="num-input" min="1" max="20" step="0.1" value="3"></div>
+            </div>
+            <div class="control-group">
+                <div class="control-label"><span class="link-b">b — Coupler</span></div>
+                <div class="input-row"><input type="range" id="bSlider" min="1" max="20" step="0.1" value="7"><input type="number" id="bNum" class="num-input" min="1" max="20" step="0.1" value="7"></div>
+            </div>
+            <div class="control-group">
+                <div class="control-label"><span class="link-c">c — Output</span></div>
+                <div class="input-row"><input type="range" id="cSlider" min="1" max="20" step="0.1" value="6"><input type="number" id="cNum" class="num-input" min="1" max="20" step="0.1" value="6"></div>
+            </div>
+
+            <hr class="divider">
+            <div class="panel-title">◈ Motion Parameters</div>
+            <div class="control-group">
+                <div class="control-label"><span>Angular Velocity ω (rad/s)</span></div>
+                <div class="input-row"><input type="range" id="wSlider" min="0.1" max="6" step="0.05" value="1"><input type="number" id="wNum" class="num-input" min="0.1" max="6" step="0.05" value="1"></div>
+            </div>
+
+            <hr class="divider">
+            <div class="panel-title">◈ Grashof Analysis</div>
+            <div class="grashof-eq">Grashof: s + l ≤ p + q<br><span id="gEqValues">— + — ≤ — + —</span></div>
+            <div class="grashof-banner crank-rocker" id="grashofBanner">
+                <div class="g-type" id="gType">CRANK-ROCKER</div>
+                <div class="g-cond" id="gDesc">Grashof satisfied. Shortest = crank a. Full rotation in, oscillation out.</div>
+            </div>
+            <div class="motion-note" id="motionNote">ℹ Input a rotates continuously (360°).</div>
+
+            <hr class="divider">
+            <div class="panel-title">◈ Quick Presets</div>
+            <div class="preset-grid">
+                <button class="btn-preset" onclick="applyPreset(3,7,6,8)">Crank-Rocker</button>
+                <button class="btn-preset" onclick="applyPreset(6,7,3,8)">Rocker-Crank</button>
+                <button class="btn-preset" onclick="applyPreset(7,9,8,4)">Double-Crank</button>
+                <button class="btn-preset" onclick="applyPreset(5,9,5,9)">Change Point - Paralelogram</button>
+                <button class="btn-preset" onclick="applyPreset(7,3,8,9)">Double-Rocker</button>
+                <button class="btn-preset" onclick="applyPreset(4,8,6,10)">Change Point</button>
+                <button class="btn-preset" onclick="applyPreset(6,6,6,8)">Non-Grashof</button>
+            </div>
+
+        </div>
+
+        <!-- RIGHT -->
+        <div class="right-col">
+            <div class="sim-panel">
+                <div class="sim-controls">
+                    <div class="status-bar"><span class="status-dot" id="status-dot"></span><span id="status-txt">STOPPED</span></div>
+                    <div class="sim-controls-btns">
+                        <button class="btn-primary" id="playBtn" onclick="togglePlay()">▶ START SIMULATION</button>
+                        <button class="btn-warning" onclick="resetSim()">↺ RESET</button>
+                    </div>
+                </div>
+                <canvas id="simCanvas"></canvas>
+                <div class="legend-row">
+                    <div class="legend-item"><div class="legend-dot" style="background:#ffd166"></div>d Ground</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#ff6b35"></div>a Crank</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#00d4ff"></div>b Coupler</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#c77dff"></div>c Rocker</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#7fff6e"></div>Coupler midpt</div>
+                </div>
+                <div class="time-display" id="timeDisplay">t = 0.000 s</div>
+            </div>
+
+            <div class="readouts-row">
+                <div class="readout"><div class="readout-label">θ₂ Crank Angle</div><div class="readout-val" id="rd-theta2">—</div></div>
+                <div class="readout"><div class="readout-label">θ₃ Coupler Angle</div><div class="readout-val" id="rd-theta3">—</div></div>
+                <div class="readout"><div class="readout-label">θ₄ Rocker Angle</div><div class="readout-val" id="rd-theta4">—</div></div>
+            </div>
+
+            <div class="plots-panel">
+                <div class="panel-title">◈ Angular Positions vs Time</div>
+                <div class="curve-toggles">
+                    <label class="curve-toggle"><input type="checkbox" id="show-theta2" checked onchange="updateCurveVisibility()"><span class="dot" style="background:#ff6b35"></span>θ₂ Crank</label>
+                    <label class="curve-toggle"><input type="checkbox" id="show-theta3" checked onchange="updateCurveVisibility()"><span class="dot" style="background:#00d4ff"></span>θ₃ Coupler</label>
+                    <label class="curve-toggle"><input type="checkbox" id="show-theta4" checked onchange="updateCurveVisibility()"><span class="dot" style="background:#c77dff"></span>θ₄ Rocker</label>
+                </div>
+                <div id="plotDiv"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+//  State
+// ═══════════════════════════════════════════════════════════════════════
+let running=false, animId=null, simTime=0, lastTimestamp=null;
+const T_WINDOW=60;
+const PHI0=Math.PI/2; // phase offset — every simulation starts with its driven point above the ground line
+let tData=[], t2Data=[], t3Data=[], t4Data=[];
+let prevTheta4=undefined;
+let prevTheta2=undefined; // for coupler-driven (Double-Rocker) branch continuity
+let lastValidSol=null;
+
+// Cached oscillation range (recomputed when params change)
+let oscRange={mid:Math.PI/2, half:Math.PI*0.55};
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Getters
+// ═══════════════════════════════════════════════════════════════════════
+const getA=()=>parseFloat(document.getElementById('aNum').value);
+const getB=()=>parseFloat(document.getElementById('bNum').value);
+const getC=()=>parseFloat(document.getElementById('cNum').value);
+const getD=()=>parseFloat(document.getElementById('dNum').value);
+const getW=()=>parseFloat(document.getElementById('wNum').value);
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Sync sliders ↔ number inputs
+// ═══════════════════════════════════════════════════════════════════════
+['a','b','c','d','w'].forEach(id=>{
+    const sl=document.getElementById(id+'Slider'), nm=document.getElementById(id+'Num');
+    sl.addEventListener('input',()=>{ nm.value=sl.value; onParamChange(); });
+    nm.addEventListener('input',()=>{
+        let v=parseFloat(nm.value); if(isNaN(v)) return;
+        v=Math.max(parseFloat(nm.min||'1'), Math.min(parseFloat(nm.max||'20'), v));
+        sl.value=v; nm.value=v; onParamChange();
+    });
+});
+function syncTrack(el){
+    const mn=parseFloat(el.min), mx=parseFloat(el.max), v=parseFloat(el.value);
+    el.style.setProperty('--pct', ((v-mn)/(mx-mn)*100).toFixed(1)+'%');
+}
+function syncAllTracks(){ ['a','b','c','d','w'].forEach(id=>syncTrack(document.getElementById(id+'Slider'))); }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Grashof analysis
+// ═══════════════════════════════════════════════════════════════════════
+function grashof(a,b,c,d){
+    const lk=[a,b,c,d], s=Math.min(...lk), l=Math.max(...lk);
+    const tmp=[...lk]; tmp.splice(tmp.indexOf(s),1); tmp.splice(tmp.indexOf(l),1);
+    const p=tmp[0], q=tmp[1], lhs=s+l, rhs=p+q;
+    const gr=lhs<=rhs, cp=Math.abs(lhs-rhs)<1e-6;
+    let type,desc,cls;
+    if(cp){
+        if(Math.abs(a-c)<1e-6 && Math.abs(b-d)<1e-6){
+            type='CHANGE-POINT (Parallelogram)';
+            desc='a=c, b=d — exact parallelogram condition. Alternates each revolution: one cycle as a true parallelogram, the next as an anti-parallelogram (crossed).';
+        } else {
+            type='CHANGE-POINT';
+            desc='s+l = p+q exactly. Passes through toggle positions — linkage can switch branches.';
+        }
+        cls='change-point';
+    } else if(!gr){
+        type='NON-GRASHOF (Triple Rocker)';
+        desc='s+l > p+q. No link can make a full revolution. All links oscillate — input rocks within a limited arc.';
+        cls='non-grashof';
+    } else {
+        const si=lk.indexOf(s);
+        if(si===0){type='CRANK-ROCKER';       desc='Shortest = crank a. Input a rotates fully (360°); output rocker c oscillates.';                                 cls='crank-rocker';}
+        else if(si===3){type='DOUBLE-CRANK';   desc='Shortest = ground d. Both input a and output c make full continuous rotations.';                               cls='double-crank';}
+        else if(si===1){type='DOUBLE-ROCKER';  desc='Shortest = coupler b. The coupler rotates fully (0°–360°); driven by it, both a and c oscillate as rockers.'; cls='double-rocker';}
+        else           {type='ROCKER-CRANK';   desc='Shortest = output rocker c. Output c rotates fully (360°); input a oscillates as a driven rocker.';  cls='rocker-crank';}
+    }
+    return{s,l,p,q,lhs,rhs,gr,cp,type,desc,cls};
+}
+
+// Oscillating for Double-Rocker and Non-Grashof; continuous for all others.
+function needsOscillation(cls){
+    return cls==='double-rocker'||cls==='non-grashof';
+}
+
+// True parallelogram/anti-parallelogram condition: opposite links equal.
+function isParallelogram(a,b,c,d){
+    return Math.abs(a-c)<1e-6 && Math.abs(b-d)<1e-6;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Compute valid θ₂ range from triangle inequality
+// ═══════════════════════════════════════════════════════════════════════
+function computeOscRange(a,b,c,d){
+    const ad2=2*a*d;
+    if(ad2<1e-12) return{mid:Math.PI/2,half:Math.PI*0.4,loAngle:Math.PI*0.1,hiAngle:Math.PI*0.9};
+
+    const cosLo=(a*a+d*d-(b+c)*(b+c))/ad2;
+    const cosHi=(a*a+d*d-(b-c)*(b-c))/ad2;
+    const cLo=Math.max(-1,cosLo), cHi=Math.min(1,cosHi);
+    if(cLo>cHi+1e-9) return{mid:Math.PI/2,half:0.05,loAngle:Math.PI/2-0.05,hiAngle:Math.PI/2+0.05};
+
+    const angLo=Math.acos(Math.min(1,cHi));  // smaller angle (near 0)
+    const angHi=Math.acos(Math.max(-1,cLo)); // larger angle (near π)
+    const mid=(angLo+angHi)/2;
+    const half=(angHi-angLo)/2;
+    return{ mid, half:Math.max(half,0.05), loAngle:angLo, hiAngle:angHi };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  θ₂ driver
+// ═══════════════════════════════════════════════════════════════════════
+function computeTheta2(time,a,b,c,d,w){
+    const g=grashof(a,b,c,d);
+    if(!needsOscillation(g.cls)) return w*time + PHI0;
+    // Sweep the full shaded arc — both above and below the ground line, starting at the top (above)
+    return oscRange.hiAngle * Math.cos(w*time);
+}
+
+function updateGrashofDisplay(){
+    const a=getA(),b=getB(),c=getC(),d=getD();
+    const g=grashof(a,b,c,d);
+
+    document.getElementById('gEqValues').innerHTML=
+        `s+l = <span class="highlight">${g.s.toFixed(1)}+${g.l.toFixed(1)} = ${g.lhs.toFixed(1)}</span> &nbsp;`+
+        `p+q = ${g.p.toFixed(1)}+${g.q.toFixed(1)} = ${g.rhs.toFixed(1)} &nbsp;`+
+        (g.gr?`<span class="highlight">✓ Grashof</span>`:`<span style="color:#ff5050">✗ Non-Grashof</span>`);
+
+    const banner=document.getElementById('grashofBanner');
+    banner.className='grashof-banner '+g.cls;
+    document.getElementById('gType').textContent=g.type;
+    document.getElementById('gDesc').textContent=g.desc;
+
+    const noteEl=document.getElementById('motionNote');
+    if(needsOscillation(g.cls)){
+        oscRange=computeOscRange(a,b,c,d);
+        const loD=(oscRange.loAngle*180/Math.PI).toFixed(1);
+        const hiD=(oscRange.hiAngle*180/Math.PI).toFixed(1);
+        noteEl.className='motion-note oscillating';
+        if(g.cls==='double-rocker'){
+            noteEl.textContent=`↻ Coupler b rotates continuously (0°–360°). Crank a and rocker c oscillate as driven links.`;
+        } else {
+            noteEl.textContent=`↔ Input a sweeps the full shaded arc, above and below the ground line: ±${(oscRange.hiAngle*180/Math.PI).toFixed(1)}° from center.`;
+        }
+    } else if(g.cls==='rocker-crank'){
+        noteEl.className='motion-note';
+        noteEl.textContent='↻ Output c rotates continuously (full 360°). Input a oscillates as a driven rocker.';
+    } else if(g.cls==='change-point' && isParallelogram(a,b,c,d)){
+        noteEl.className='motion-note';
+        noteEl.textContent='↻⇄ Input a rotates continuously. Alternates each revolution: true parallelogram, then crossed anti-parallelogram.';
+    } else {
+        noteEl.className='motion-note';
+        noteEl.textContent='↻ Input a rotates continuously (full 360°).';
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Geometric solver — two-circle intersection
+//
+//  O₂=(0,0), O₄=(d,0)
+//  A = O₂ + a(cosθ₂, sinθ₂)   — crank pin
+//  B lies on circle(O₄,c) ∩ circle(A,b)  — coupler-rocker pin
+//  |AB|=b, |O₄B|=c  guaranteed → links never change length
+// ═══════════════════════════════════════════════════════════════════════
+function solve(theta2,a,b,c,d,mode){
+    const Ax=a*Math.cos(theta2), Ay=a*Math.sin(theta2);
+    const fx=d-Ax, fy=-Ay;
+    const f=Math.sqrt(fx*fx+fy*fy);
+    if(f<1e-12||f>b+c+1e-9||f<Math.abs(b-c)-1e-9) return null;
+
+    const ca=Math.max(-1,Math.min(1,(f*f+c*c-b*b)/(2*f*c)));
+    const sa=Math.sqrt(Math.max(0,1-ca*ca));
+    const ux=-fx/f, uy=-fy/f, vx=-uy, vy=ux;
+
+    const Cx1=d+c*(ux*ca+vx*sa), Cy1=c*(uy*ca+vy*sa);
+    const Cx2=d+c*(ux*ca-vx*sa), Cy2=c*(uy*ca-vy*sa);
+    const T1=Math.atan2(Cy1,Cx1-d), T2=Math.atan2(Cy2,Cx2-d);
+    const ad=(x,y)=>{let dd=x-y;while(dd>Math.PI)dd-=2*Math.PI;while(dd<-Math.PI)dd+=2*Math.PI;return dd;};
+
+    let theta4,Cx,Cy;
+    if(mode==='parallel'||mode==='anti'){
+        // Explicit branch forcing: 'parallel' picks the solution closest to theta2 (true
+        // parallelogram, θ4≈θ2); 'anti' picks the other one (crossed anti-parallelogram).
+        const dd1=Math.abs(ad(T1,theta2)), dd2=Math.abs(ad(T2,theta2));
+        const pickT1 = mode==='parallel' ? (dd1<=dd2) : (dd1>dd2);
+        if(pickT1){ theta4=T1; Cx=Cx1; Cy=Cy1; } else { theta4=T2; Cx=Cx2; Cy=Cy2; }
+    } else if(prevTheta4===undefined){ theta4=T1; Cx=Cx1; Cy=Cy1; }
+    else{
+        // At dead-center (sa≈0) the two branches coincide — branch switching is natural.
+        // Choose the branch closest to the previous theta4 (continuity tracking).
+        if(Math.abs(ad(T1,prevTheta4))<=Math.abs(ad(T2,prevTheta4))){ theta4=T1; Cx=Cx1; Cy=Cy1; }
+        else{ theta4=T2; Cx=Cx2; Cy=Cy2; }
+    }
+    prevTheta4=theta4;
+    return{ theta4, theta3:Math.atan2(Cy-Ay,Cx-Ax), Ax, Ay, Cx, Cy };
+}
+
+function toDeg(r){ return (r*180/Math.PI).toFixed(1)+'°'; }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Coupler-driven solver (for Double-Rocker)
+//  Input: theta3 (coupler angle, rotates continuously 0→2π)
+//  Finds A on circle(O2,a) such that |A + b*(cos t3, sin t3) - O4| = c
+//  Returns full linkage positions with branch continuity tracking via prevTheta2
+// ═══════════════════════════════════════════════════════════════════════
+function solveFromCoupler(theta3, a, b, c, d){
+    const P = 2*a*(b*Math.cos(theta3) - d);
+    const Q = 2*a*b*Math.sin(theta3);
+    const R = c*c - a*a - b*b - d*d + 2*b*d*Math.cos(theta3);
+    const M = Math.sqrt(P*P + Q*Q);
+    if(M < 1e-12) return null;
+    const ratio = R / M;
+    if(Math.abs(ratio) > 1 + 1e-9) return null;
+    const alpha = Math.acos(Math.max(-1, Math.min(1, ratio)));
+    const base  = Math.atan2(Q, P);
+    const t2a = base + alpha;
+    const t2b = base - alpha;
+
+    // Branch continuity: pick t2 closest to previous
+    // On first call, choose the branch where A is above the ground bar (Ay > 0)
+    let theta2;
+    if(prevTheta2 === undefined){
+        const Ay_a = a*Math.sin(t2a), Ay_b = a*Math.sin(t2b);
+        theta2 = Ay_a >= Ay_b ? t2a : t2b;
+    } else {
+        const angDiff = (x,y)=>{ let d=x-y; while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI; return d; };
+        theta2 = Math.abs(angDiff(t2a, prevTheta2)) <= Math.abs(angDiff(t2b, prevTheta2)) ? t2a : t2b;
+    }
+    prevTheta2 = theta2;
+
+    const Ax = a*Math.cos(theta2), Ay = a*Math.sin(theta2);
+    const Bx = Ax + b*Math.cos(theta3), By = Ay + b*Math.sin(theta3);
+    const theta4 = Math.atan2(By, Bx - d);
+    prevTheta4 = theta4;
+    return { theta2, theta3, theta4, Ax, Ay, Cx: Bx, Cy: By };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Output-driven solver (for Rocker-Crank)
+//  Input: theta4 (output rocker/crank angle, rotates continuously 0→2π)
+//  Finds A on circle(O2,a) such that |A - C| = b, where C is fixed by theta4
+//  Returns full linkage positions with branch continuity tracking via prevTheta2
+// ═══════════════════════════════════════════════════════════════════════
+function solveFromOutput(theta4, a, b, c, d){
+    const Cx=d+c*Math.cos(theta4), Cy=c*Math.sin(theta4);
+    const fx=Cx, fy=Cy; // vector from O2=(0,0) to C
+    const f=Math.sqrt(fx*fx+fy*fy);
+    if(f<1e-12||f>a+b+1e-9||f<Math.abs(a-b)-1e-9) return null;
+
+    const ca=Math.max(-1,Math.min(1,(f*f+a*a-b*b)/(2*f*a)));
+    const sa=Math.sqrt(Math.max(0,1-ca*ca));
+    const ux=fx/f, uy=fy/f, vx=-uy, vy=ux;
+
+    const Ax1=a*(ux*ca+vx*sa), Ay1=a*(uy*ca+vy*sa);
+    const Ax2=a*(ux*ca-vx*sa), Ay2=a*(uy*ca-vy*sa);
+    const T1=Math.atan2(Ay1,Ax1), T2=Math.atan2(Ay2,Ax2);
+
+    let theta2,Ax,Ay;
+    if(prevTheta2===undefined){
+        // On first call, choose the branch where A is above the ground bar (Ay > 0)
+        if(Ay1>=Ay2){ theta2=T1; Ax=Ax1; Ay=Ay1; } else { theta2=T2; Ax=Ax2; Ay=Ay2; }
+    }
+    else{
+        const ad=(x,y)=>{let dd=x-y;while(dd>Math.PI)dd-=2*Math.PI;while(dd<-Math.PI)dd+=2*Math.PI;return dd;};
+        if(Math.abs(ad(T1,prevTheta2))<=Math.abs(ad(T2,prevTheta2))){ theta2=T1; Ax=Ax1; Ay=Ay1; }
+        else{ theta2=T2; Ax=Ax2; Ay=Ay2; }
+    }
+    prevTheta2=theta2;
+    const theta3=Math.atan2(Cy-Ay,Cx-Ax);
+    return { theta2, theta3, theta4, Ax, Ay, Cx, Cy };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Canvas
+// ═══════════════════════════════════════════════════════════════════════
+const canvas=document.getElementById('simCanvas');
+const ctx=canvas.getContext('2d');
+
+function resizeCanvas(){
+    canvas.width=canvas.parentElement.clientWidth;
+    canvas.height=Math.round(canvas.width*0.52);  // ~16:8.3 aspect — tall enough
+    canvas.height=Math.max(canvas.height,420);
+}
+
+function drawCanvas(time){
+    const a=getA(),b=getB(),c=getC(),d=getD(),w=getW();
+    const W=canvas.width, H=canvas.height;
+    ctx.clearRect(0,0,W,H);
+
+    // Background grid
+    ctx.strokeStyle='rgba(0,212,255,0.04)'; ctx.lineWidth=1;
+    for(let x=0;x<W;x+=30){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    for(let y=0;y<H;y+=30){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+    // ── Scale: one universal px/cm so all links are proportional ──
+    const g=grashof(a,b,c,d);
+    const isOsc=needsOscillation(g.cls);
+
+    // Bounding box in link-length units:
+    //   horizontal: from −a to d+max(a,c), plus swing headroom
+    //   vertical:   from −max(a,b,c) to +max(a,b,c)
+    const xSpan=a + d + Math.max(a,c) + 2;
+    const ySpan=2*(Math.max(a,b,c)+1);
+    const margin=60;
+    const scale=Math.min((W-2*margin)/xSpan, (H-2*margin)/ySpan);
+
+    // Place O₂ so the full mechanism is centred horizontally
+    const mechW=d*scale;
+    const O2x=(W-mechW)/2 - (d/2 - a)*scale*0.1;
+    const O2y=H/2;
+    const O4x=O2x+d*scale, O4y=O2y;
+
+    // Double-Rocker: drive from coupler angle (rotates continuously)
+    // All others: drive from input crank angle
+    let sol, theta2;
+    if(g.cls==='double-rocker'){
+        const theta3 = ((w*time+PHI0)%(2*Math.PI)+2*Math.PI)%(2*Math.PI); // coupler angle — resets to 0 at 360°
+        sol = solveFromCoupler(theta3, a, b, c, d);
+        theta2 = sol ? sol.theta2 : 0;
+    } else if(g.cls==='rocker-crank'){
+        const theta4 = ((w*time+PHI0)%(2*Math.PI)+2*Math.PI)%(2*Math.PI); // output c rotates fully — resets to 0 at 360°
+        sol = solveFromOutput(theta4, a, b, c, d);
+        theta2 = sol ? sol.theta2 : 0;
+    } else if(g.cls==='change-point' && isParallelogram(a,b,c,d)){
+        const theta2raw = w*time+PHI0;
+        const cycle = Math.floor(theta2raw/(2*Math.PI));
+        const mode = (cycle%2===0) ? 'parallel' : 'anti'; // alternate one full revolution at a time
+        sol = solve(theta2raw, a, b, c, d, mode);
+        theta2 = theta2raw;
+    } else {
+        theta2 = computeTheta2(time,a,b,c,d,w);
+        sol = solve(theta2,a,b,c,d);
+    }
+    if(sol) lastValidSol=sol;
+    const assembles=sol!==null;
+
+    // For oscillating modes: draw the valid arc shading on the crank circle
+    if(isOsc){
+        ctx.save();
+        ctx.strokeStyle='rgba(255,209,102,0.18)';
+        ctx.lineWidth=a*scale*0.35;
+        ctx.lineCap='butt';
+        ctx.beginPath();
+        // Valid arc: from loAngle to hiAngle (upper) and mirror (lower)
+        const lo=-oscRange.hiAngle, hi=-oscRange.loAngle;
+        ctx.arc(O2x,O2y,a*scale,lo,hi,false);
+        ctx.stroke();
+        // Mirror arc
+        ctx.beginPath();
+        ctx.arc(O2x,O2y,a*scale,-hi,-lo,false);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // ── Ground link (dashed) ──
+    ctx.save();
+    ctx.strokeStyle='rgba(255,209,102,0.5)'; ctx.lineWidth=3; ctx.setLineDash([6,4]);
+    ctx.beginPath(); ctx.moveTo(O2x,O2y); ctx.lineTo(O4x,O4y); ctx.stroke();
+    ctx.restore();
+    drawGround(O2x,O2y); drawGround(O4x,O4y);
+
+    if(!assembles){
+        ctx.font='14px Orbitron,monospace'; ctx.fillStyle='#ff5050'; ctx.textAlign='center';
+        ctx.fillText('Non-assembling at this angle',W/2,H/2-24);
+        drawPivot(O2x,O2y,'#ffd166',9); drawPivot(O4x,O4y,'#ffd166',9);
+        return;
+    }
+
+    // Canvas coords (flip y)
+    const Ax_px=O2x+sol.Ax*scale, Ay_px=O2y-sol.Ay*scale;
+    const Bx_px=O2x+sol.Cx*scale, By_px=O2y-sol.Cy*scale;
+
+    // Ghost crank circle
+    ctx.save();
+    ctx.strokeStyle='rgba(255,107,53,0.15)'; ctx.lineWidth=1.5; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.arc(O2x,O2y,a*scale,0,2*Math.PI); ctx.stroke();
+    ctx.restore();
+
+    // Links
+    drawLink(O2x,O2y,Ax_px,Ay_px,'#ff6b35',5,12);   // crank a
+    drawLink(Ax_px,Ay_px,Bx_px,By_px,'#00d4ff',5,10); // coupler b
+    drawLink(O4x,O4y,Bx_px,By_px,'#c77dff',5,10);    // rocker c
+
+    // Coupler midpoint
+    ctx.save();
+    ctx.fillStyle='#7fff6e'; ctx.shadowColor='#7fff6e'; ctx.shadowBlur=12;
+    ctx.beginPath(); ctx.arc((Ax_px+Bx_px)/2,(Ay_px+By_px)/2,5,0,2*Math.PI); ctx.fill();
+    ctx.restore();
+
+    // Joints
+    drawPivot(O2x,O2y,'#ffd166',9);
+    drawPivot(O4x,O4y,'#ffd166',9);
+    drawPivot(Ax_px,Ay_px,'#ff6b35',7);
+    drawPivot(Bx_px,By_px,'#c77dff',7);
+
+    // Link labels
+    linkLabel(O2x,O2y,Ax_px,Ay_px,'a','#ff6b35');
+    linkLabel(Ax_px,Ay_px,Bx_px,By_px,'b','rgba(0,212,255,0.9)');
+    linkLabel(O4x,O4y,Bx_px,By_px,'c','#c77dff');
+    linkLabel(O2x,O2y,O4x,O4y,'d','rgba(255,209,102,0.8)',true);
+
+    // θ₂ arc
+    ctx.save();
+    const t2n=((theta2%(2*Math.PI))+2*Math.PI)%(2*Math.PI);
+    const r2=a*scale*0.42;
+    ctx.strokeStyle='rgba(255,107,53,0.6)'; ctx.lineWidth=1.8;
+    ctx.beginPath(); ctx.arc(O2x,O2y,r2,0,-t2n,true); ctx.stroke();
+    ctx.fillStyle='rgba(255,107,53,0.9)'; ctx.font='12px Share Tech Mono,monospace'; ctx.textAlign='left';
+    ctx.fillText('θ₂',O2x+r2+5,O2y-5);
+    ctx.restore();
+
+    // θ₄ arc
+    ctx.save();
+    const r4=c*scale*0.38;
+    ctx.strokeStyle='rgba(199,125,255,0.6)'; ctx.lineWidth=1.8;
+    ctx.beginPath(); ctx.arc(O4x,O4y,r4,0,-sol.theta4,sol.theta4>0); ctx.stroke();
+    ctx.fillStyle='rgba(199,125,255,0.9)'; ctx.font='12px Share Tech Mono,monospace'; ctx.textAlign='right';
+    ctx.fillText('θ₄',O4x-r4-5,O4y-5);
+    ctx.restore();
+
+    // ── Coupler reference: horizontal dashed line at crank pin A, θ₃ arc ──
+    const refLen=b*scale*0.55; // half-length of horizontal reference line
+    ctx.save();
+    ctx.strokeStyle='rgba(0,212,255,0.55)'; ctx.lineWidth=1.5; ctx.setLineDash([6,5]);
+    ctx.beginPath(); ctx.moveTo(Ax_px-refLen,Ay_px); ctx.lineTo(Ax_px+refLen,Ay_px); ctx.stroke();
+    ctx.restore();
+    // θ₃ arc from horizontal reference to coupler direction
+    ctx.save();
+    const r3=b*scale*0.28;
+    const t3=sol.theta3; // coupler angle (from +x axis)
+    ctx.strokeStyle='rgba(0,212,255,0.7)'; ctx.lineWidth=1.8;
+    ctx.beginPath();
+    // arc from 0 to -t3 (canvas y is flipped)
+    if(t3>=0){
+        ctx.arc(Ax_px,Ay_px,r3,0,-t3,true);
+    } else {
+        ctx.arc(Ax_px,Ay_px,r3,0,-t3,false);
+    }
+    ctx.stroke();
+    ctx.fillStyle='rgba(0,212,255,0.9)'; ctx.font='12px Share Tech Mono,monospace'; ctx.textAlign='left';
+    ctx.fillText('θ₃',Ax_px+r3+4,Ay_px-4);
+    ctx.restore();
+
+    // Readouts — always shown as positive angles measured from the +x axis (0°–360°)
+    const t3n=((sol.theta3%(2*Math.PI))+2*Math.PI)%(2*Math.PI);
+    const t4n=((sol.theta4%(2*Math.PI))+2*Math.PI)%(2*Math.PI);
+    document.getElementById('rd-theta2').textContent=toDeg(t2n);
+    document.getElementById('rd-theta3').textContent=toDeg(t3n);
+    document.getElementById('rd-theta4').textContent=toDeg(t4n);
+}
+
+function drawLink(x1,y1,x2,y2,col,lw,blur){
+    ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=lw;
+    ctx.shadowColor=col; ctx.shadowBlur=blur; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.restore();
+}
+function drawPivot(x,y,col,r){
+    ctx.save();
+    ctx.fillStyle=col; ctx.shadowColor=col; ctx.shadowBlur=16;
+    ctx.beginPath(); ctx.arc(x,y,r,0,2*Math.PI); ctx.fill();
+    ctx.fillStyle='#0d1626';
+    ctx.beginPath(); ctx.arc(x,y,r*0.38,0,2*Math.PI); ctx.fill();
+    ctx.restore();
+}
+function drawGround(x,y){
+    ctx.save(); ctx.strokeStyle='rgba(255,209,102,0.45)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(x-14,y+7); ctx.lineTo(x+14,y+7); ctx.stroke();
+    [-1,0,1].forEach(i=>{
+        ctx.beginPath(); ctx.moveTo(x+i*8,y+7); ctx.lineTo(x+i*8-5,y+14); ctx.stroke();
+    });
+    ctx.restore();
+}
+function linkLabel(x1,y1,x2,y2,lbl,col,below){
+    const mx=(x1+x2)/2, my=(y1+y2)/2;
+    const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy)||1;
+    const nx=-dy/len, ny=dx/len, off=below?18:-18;
+    ctx.save();
+    ctx.fillStyle=col; ctx.font='bold 13px Share Tech Mono,monospace';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(lbl, mx+nx*off, my+ny*off);
+    ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Plot
+// ═══════════════════════════════════════════════════════════════════════
+let plotInitialized=false;
+function initPlot(){
+    const layout={
+        paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(13,22,38,0.6)',
+        font:{family:'Share Tech Mono, monospace',size:11,color:'#5a7a9a'},
+        margin:{t:10,b:42,l:58,r:14},
+        showlegend:false,
+        xaxis:{title:{text:'t (s)'},gridcolor:'rgba(30,58,95,0.8)',zerolinecolor:'rgba(30,58,95,1)',color:'#5a7a9a'},
+        yaxis:{title:{text:'Angle (rad)'},gridcolor:'rgba(30,58,95,0.8)',zerolinecolor:'rgba(30,58,95,0.5)',color:'#5a7a9a'}
+    };
+    const traces=[
+        {x:[],y:[],name:'θ₂ Crank',  line:{color:'#ff6b35',width:2.5},mode:'lines'},
+        {x:[],y:[],name:'θ₃ Coupler',line:{color:'#00d4ff',width:2.5},mode:'lines'},
+        {x:[],y:[],name:'θ₄ Rocker', line:{color:'#c77dff',width:2.5},mode:'lines'},
+    ];
+    Plotly.newPlot('plotDiv',traces,layout,{displayModeBar:false,responsive:true});
+    plotInitialized=true;
+    updateCurveVisibility();
+}
+function updateCurveVisibility(){
+    if(!plotInitialized) return;
+    const v2=document.getElementById('show-theta2').checked;
+    const v3=document.getElementById('show-theta3').checked;
+    const v4=document.getElementById('show-theta4').checked;
+    Plotly.restyle('plotDiv',{visible:[v2,v3,v4]});
+}
+function updatePlot(){
+    if(!plotInitialized) return;
+    const cutoff=simTime-T_WINDOW, idx=Math.max(0,tData.findIndex(v=>v>=cutoff));
+    Plotly.restyle('plotDiv',{
+        x:[tData.slice(idx),tData.slice(idx),tData.slice(idx)],
+        y:[t2Data.slice(idx),t3Data.slice(idx),t4Data.slice(idx)]
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Animation loop
+// ═══════════════════════════════════════════════════════════════════════
+function step(ts){
+    if(!running) return;
+    if(lastTimestamp===null) lastTimestamp=ts;
+    const dt=(ts-lastTimestamp)/1000; lastTimestamp=ts; simTime+=dt;
+    const a=getA(),b=getB(),c=getC(),d=getD(),w=getW();
+    const g=grashof(a,b,c,d);
+    let sol, theta2;
+    if(g.cls==='double-rocker'){
+        const theta3=((w*simTime+PHI0)%(2*Math.PI)+2*Math.PI)%(2*Math.PI); // resets to 0 at 360°
+        sol=solveFromCoupler(theta3,a,b,c,d);
+        theta2=sol?sol.theta2:0;
+    } else if(g.cls==='rocker-crank'){
+        const theta4=((w*simTime+PHI0)%(2*Math.PI)+2*Math.PI)%(2*Math.PI); // output c rotates fully, resets at 360°
+        sol=solveFromOutput(theta4,a,b,c,d);
+        theta2=sol?sol.theta2:0;
+    } else if(g.cls==='change-point' && isParallelogram(a,b,c,d)){
+        const theta2raw=w*simTime+PHI0;
+        const cycle=Math.floor(theta2raw/(2*Math.PI));
+        const mode=(cycle%2===0)?'parallel':'anti'; // alternate one full revolution at a time
+        sol=solve(theta2raw,a,b,c,d,mode);
+        theta2=theta2raw;
+    } else {
+        theta2=computeTheta2(simTime,a,b,c,d,w);
+        sol=solve(theta2,a,b,c,d);
+    }
+    if(sol){
+        const t2n=((theta2%(2*Math.PI))+2*Math.PI)%(2*Math.PI);
+        const t3n=((sol.theta3%(2*Math.PI))+2*Math.PI)%(2*Math.PI);
+        const t4n=((sol.theta4%(2*Math.PI))+2*Math.PI)%(2*Math.PI);
+        tData.push(simTime); t2Data.push(t2n); t3Data.push(t3n); t4Data.push(t4n);
+    }
+    document.getElementById('timeDisplay').textContent='t = '+simTime.toFixed(3)+' s';
+    drawCanvas(simTime);
+    if(tData.length%8===0) updatePlot();
+    animId=requestAnimationFrame(step);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Controls
+// ═══════════════════════════════════════════════════════════════════════
+function togglePlay(){
+    running=!running;
+    const btn=document.getElementById('playBtn'),
+          dot=document.getElementById('status-dot'),
+          txt=document.getElementById('status-txt');
+    if(running){
+        btn.textContent='⏸ PAUSE'; dot.classList.add('running'); txt.textContent='RUNNING';
+        lastTimestamp=null; animId=requestAnimationFrame(step);
+    } else {
+        btn.textContent='▶ RESUME'; dot.classList.remove('running'); txt.textContent='PAUSED';
+        if(animId) cancelAnimationFrame(animId);
+    }
+}
+function resetSim(){
+    running=false; if(animId) cancelAnimationFrame(animId);
+    simTime=0; lastTimestamp=null; prevTheta4=undefined; prevTheta2=undefined; lastValidSol=null;
+    tData=[]; t2Data=[]; t3Data=[]; t4Data=[];
+    document.getElementById('playBtn').textContent='▶ START SIMULATION';
+    document.getElementById('status-dot').classList.remove('running');
+    document.getElementById('status-txt').textContent='STOPPED';
+    document.getElementById('timeDisplay').textContent='t = 0.000 s';
+    ['rd-theta2','rd-theta3','rd-theta4'].forEach(id=>document.getElementById(id).textContent='—');
+    if(plotInitialized) Plotly.restyle('plotDiv',{x:[[],[],[]],y:[[],[],[]]});
+    drawCanvas(0);
+}
+function onParamChange(){
+    syncAllTracks();
+    prevTheta4=undefined; prevTheta2=undefined; lastValidSol=null;
+    updateGrashofDisplay(); // also refreshes oscRange
+    if(!running) drawCanvas(simTime);
+}
+function applyPreset(a,b,c,d){
+    [['a',a],['b',b],['c',c],['d',d]].forEach(([id,v])=>{
+        document.getElementById(id+'Slider').value=v;
+        document.getElementById(id+'Num').value=v;
+    });
+    resetSim(); onParamChange();
+    showToast(grashof(a,b,c,d).type);
+}
+function showToast(msg){
+    const el=document.getElementById('toast');
+    el.textContent=msg; el.classList.add('show');
+    setTimeout(()=>el.classList.remove('show'),2800);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Init
+// ═══════════════════════════════════════════════════════════════════════
+window.addEventListener('resize',()=>{ resizeCanvas(); drawCanvas(simTime); });
+resizeCanvas();
+syncAllTracks();
+updateGrashofDisplay();
+initPlot();
+drawCanvas(0);
+</script>
+</body>
+</html>
